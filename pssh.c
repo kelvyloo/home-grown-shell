@@ -7,6 +7,9 @@
 #include "builtin.h"
 #include "parse.h"
 
+#include <sys/types.h> /* pid_t                              */
+#include <sys/wait.h>  /* waitpid(), WEXITSTATUS()           */
+
 /*******************************************
  * Set to 1 to view the command line parse *
  *******************************************/
@@ -16,7 +19,7 @@
 void print_banner ()
 {
     printf ("                    ________   \n");
-    printf ("_________________________  /_  \n");
+    printf ("   ______________________  /_  \n");
     printf ("___  __ \\_  ___/_  ___/_  __ \\ \n");
     printf ("__  /_/ /(__  )_(__  )_  / / / \n");
     printf ("_  .___//____/ /____/ /_/ /_/  \n");
@@ -87,7 +90,29 @@ void execute_tasks (Parse* P)
             builtin_execute (P->tasks[t]);
         }
         else if (command_found (P->tasks[t].cmd)) {
-            printf ("pssh: found but can't exec: %s\n", P->tasks[t].cmd);
+
+            //printf ("pssh: found but can't exec: %s\n", P->tasks[t].cmd);
+            pid_t pid;
+
+            pid = fork();
+
+            if (pid < 0) {
+                fprintf(stderr, "error -- failed to fork()");
+                exit(EXIT_FAILURE);
+            }
+
+            if (pid > 0) {
+                /* only executed by the PARENT process */
+                int child_ret;
+                waitpid(pid, &child_ret, 0);
+            } 
+            
+            else {
+                if(execvp(P->tasks[t].cmd, P->tasks[t].argv)) {
+                    printf("Failed to exec %s\n", P->tasks[t].cmd);
+                    exit(EXIT_FAILURE);
+                }
+            }
         }
         else {
             printf ("pssh: command not found: %s\n", P->tasks[t].cmd);
