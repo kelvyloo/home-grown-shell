@@ -5,6 +5,6 @@
 
 int execute_cmd(Task task);
 
-int execute_pipe_cmd(Task task)
+int execute_pipe_cmd(Task task);
 
 #endif
