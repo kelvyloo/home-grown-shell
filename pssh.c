@@ -7,13 +7,12 @@
 #include "builtin.h"
 #include "parse.h"
 
-#include <sys/types.h> /* pid_t                              */
-#include <sys/wait.h>  /* waitpid(), WEXITSTATUS()           */
+#include "fork_and_exec.h"
 
 /*******************************************
  * Set to 1 to view the command line parse *
  *******************************************/
-#define DEBUG_PARSE 0
+#define DEBUG_PARSE 1
 
 
 void print_banner ()
@@ -90,29 +89,11 @@ void execute_tasks (Parse* P)
             builtin_execute (P->tasks[t]);
         }
         else if (command_found (P->tasks[t].cmd)) {
+            int ret_val;
 
-            //printf ("pssh: found but can't exec: %s\n", P->tasks[t].cmd);
-            pid_t pid;
+            ret_val = execute_cmd(P->tasks, P->ntasks);
 
-            pid = fork();
-
-            if (pid < 0) {
-                fprintf(stderr, "error -- failed to fork()");
-                exit(EXIT_FAILURE);
-            }
-
-            if (pid > 0) {
-                /* only executed by the PARENT process */
-                int child_ret;
-                waitpid(pid, &child_ret, 0);
-            } 
-            
-            else {
-                if(execvp(P->tasks[t].cmd, P->tasks[t].argv)) {
-                    printf("Failed to exec %s\n", P->tasks[t].cmd);
-                    exit(EXIT_FAILURE);
-                }
-            }
+            if (ret_val) { exit(EXIT_FAILURE); }
         }
         else {
             printf ("pssh: command not found: %s\n", P->tasks[t].cmd);
