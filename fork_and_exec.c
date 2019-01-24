@@ -6,33 +6,34 @@
 
 #include "parse.h" /* Task struct */
 
-int execute_cmd(Task *tasks, int ntasks) 
+int execute_cmd(Task task)
 {
-    unsigned int t;
+    pid_t pid;
 
-    for (t = 0; t < ntasks; t++) {
-        pid_t pid;
+    pid = fork();
 
-        pid = fork();
+    if (pid < 0) {
+        fprintf(stderr, "error -- failed to fork()");
+        exit(EXIT_FAILURE);
+    }
 
-        if (pid < 0) {
-            fprintf(stderr, "error -- failed to fork()");
+    if (pid > 0) {
+        /* only executed by the PARENT process */
+        int child_ret;
+        waitpid(pid, &child_ret, 0);
+    } 
+    
+    else {
+        if(execvp(task.cmd, task.argv)) {
+            printf("Failed to exec %s\n", task.cmd);
             exit(EXIT_FAILURE);
-        }
-
-        if (pid > 0) {
-            /* only executed by the PARENT process */
-            int child_ret;
-            waitpid(pid, &child_ret, 0);
-        } 
-        
-        else {
-            if(execvp(tasks[t].cmd, tasks[t].argv)) {
-                printf("Failed to exec %s\n", tasks[t].cmd);
-                exit(EXIT_FAILURE);
-            }
         }
     }
 
+    return EXIT_SUCCESS;
+}
+
+int execute_pipe_cmd(Task task)
+{
     return EXIT_SUCCESS;
 }

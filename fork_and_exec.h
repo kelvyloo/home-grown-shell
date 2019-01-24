@@ -3,6 +3,8 @@
 
 #include "parse.h"
 
-int execute_cmd(Task *tasks, int ntasks);
+int execute_cmd(Task task);
+
+int execute_pipe_cmd(Task task)
 
 #endif
