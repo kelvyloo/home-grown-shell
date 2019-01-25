@@ -4,7 +4,7 @@
 #include <sys/wait.h>  /* waitpid(), WEXITSTATUS()*/
 #include <unistd.h>    /* execvp(), fork()        */
 
-#include "parse.h" /* Task struct */
+#include "parse.h"     /* Task struct */
 
 int execute_cmd(Task task)
 {
@@ -30,10 +30,5 @@ int execute_cmd(Task task)
         }
     }
 
-    return EXIT_SUCCESS;
-}
-
-int execute_pipe_cmd(Task task)
-{
     return EXIT_SUCCESS;
 }
