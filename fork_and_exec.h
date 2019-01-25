@@ -3,6 +3,6 @@
 
 #include "parse.h"
 
-int execute_cmd(Task task);
+int execute_cmd(Parse *P, int t);
 
 #endif

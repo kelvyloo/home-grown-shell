@@ -5,8 +5,30 @@
 #include <unistd.h>    /* execvp(), fork()        */
 
 #include "parse.h"     /* Task struct */
+#include <fcntl.h>     /* open()      */
 
-int execute_cmd(Task task)
+static int redirect_output(char *outfile) 
+{
+    unsigned int out_fd = 0;
+
+    if (outfile != NULL) {
+        out_fd = open(outfile, O_CREAT | O_RDONLY | O_WRONLY, 0644);
+        
+        if (out_fd == -1) {
+            printf("pssh: failed to open/create file %s\n", outfile);
+            return EXIT_FAILURE;
+        }
+        else {
+            if (dup2(out_fd, STDOUT_FILENO) == -1) {
+                printf("pssh: failed to redirect output to %s\n", outfile);
+                return EXIT_FAILURE;
+            }
+        }
+    }
+    return EXIT_SUCCESS;
+}
+
+int execute_cmd(Parse *P, int t)
 {
     pid_t pid;
 
@@ -24,8 +46,13 @@ int execute_cmd(Task task)
     } 
     
     else {
-        if(execvp(task.cmd, task.argv)) {
-            printf("Failed to exec %s\n", task.cmd);
+        if (redirect_output(P->outfile)) {
+            printf("Failed to redirect output\n");
+            exit(EXIT_FAILURE);
+        }
+
+        if(execvp(P->tasks[t].cmd, P->tasks[t].argv)) {
+            printf("Failed to exec %s\n", P->tasks[t].cmd);
             exit(EXIT_FAILURE);
         }
     }
