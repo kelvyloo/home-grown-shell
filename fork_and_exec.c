@@ -28,6 +28,27 @@ static int redirect_output(char *outfile)
     return EXIT_SUCCESS;
 }
 
+static int redirect_input(char *infile) 
+{
+    unsigned int in_fd = 0;
+
+    if (infile != NULL) {
+        in_fd = open(infile, O_RDONLY);
+        
+        if (in_fd == -1) {
+            printf("pssh: failed to open/create file %s\n", infile);
+            return EXIT_FAILURE;
+        }
+        else {
+            if (dup2(in_fd, STDIN_FILENO) == -1) {
+                printf("pssh: failed to redirect input to %s\n", infile);
+                return EXIT_FAILURE;
+            }
+        }
+    }
+    return EXIT_SUCCESS;
+}
+
 int execute_cmd(Parse *P, int t)
 {
     pid_t pid;
@@ -48,6 +69,11 @@ int execute_cmd(Parse *P, int t)
     else {
         if (redirect_output(P->outfile)) {
             printf("Failed to redirect output\n");
+            exit(EXIT_FAILURE);
+        }
+
+        if (redirect_input(P->infile)) {
+            printf("Failed to redirect input\n");
             exit(EXIT_FAILURE);
         }
 
