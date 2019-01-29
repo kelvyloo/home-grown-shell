@@ -75,7 +75,6 @@ static int command_found (const char* cmd)
     return ret;
 }
 
-
 /* Called upon receiving a successful parse.
  * This function is responsible for cycling through the
  * tasks, and forking, executing, etc as necessary to get
@@ -89,11 +88,14 @@ void execute_tasks (Parse* P)
             builtin_execute (P->tasks[t]);
         }
         else if (command_found (P->tasks[t].cmd)) {
+            /* Execute single cmds */
             int ret_val;
 
-            ret_val = execute_cmd(P->tasks, P->ntasks);
+            ret_val = execute_cmd(P, t);
 
-            if (ret_val) { exit(EXIT_FAILURE); }
+            if (ret_val) { 
+                printf("pssh: failed to execute cmd: %s\n", P->tasks[t].cmd);
+            }
         }
         else {
             printf ("pssh: command not found: %s\n", P->tasks[t].cmd);
