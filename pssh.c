@@ -12,8 +12,7 @@
 /*******************************************
  * Set to 1 to view the command line parse *
  *******************************************/
-#define DEBUG_PARSE 1
-
+#define DEBUG_PARSE 0
 
 void print_banner ()
 {
@@ -82,25 +81,55 @@ static int command_found (const char* cmd)
 void execute_tasks (Parse* P)
 {
     unsigned int t;
+    int pipe_fd[2] = {0};
+    int input_fd = 0;
+    pid_t pid;
 
     for (t = 0; t < P->ntasks; t++) {
         if (is_builtin (P->tasks[t].cmd)) {
             builtin_execute (P->tasks[t]);
         }
         else if (command_found (P->tasks[t].cmd)) {
-            /* Execute single cmds */
-            int ret_val;
+            if (pipe(pipe_fd) == -1) {
+                fprintf(stderr, "error -- failed to create pipe");
+            }
 
-            ret_val = execute_cmd(P, t);
+            pid = fork();
 
-            if (ret_val) { 
-                printf("pssh: failed to execute cmd: %s\n", P->tasks[t].cmd);
+            if (pid < 0) {
+                fprintf(stderr, "error -- failed to fork()");
+            }
+            else if (pid > 0) {
+                wait(NULL);
+                close(pipe_fd[WRITE_SIDE]);
+                input_fd = pipe_fd[READ_SIDE];
+            }
+            else {
+                if (t == 0) { check_and_redirect_input(P->infile); }
+
+                if (dup2(input_fd, STDIN_FILENO) == -1) {
+                    fprintf(stderr, "error -- dup2() failed for input_fd -> STDIN\n");
+                }
+
+                if (t != (P->ntasks-1)) { 
+                    if (dup2(pipe_fd[WRITE_SIDE], STDOUT_FILENO) == -1) {
+                        fprintf(stderr, "error -- dup2() failed for WRITE_SIDE -> STDOUT\n");
+                    }
+                }
+                close(pipe_fd[READ_SIDE]);
+
+                if (t == P->ntasks-1) { check_and_redirect_output(P->outfile); }
+
+                if (execvp(P->tasks[t].cmd, P->tasks[t].argv)) {
+                    printf("Failed to exec %s\n", P->tasks[t].cmd);
+                }
             }
         }
         else {
             printf ("pssh: command not found: %s\n", P->tasks[t].cmd);
             break;
         }
+
     }
 }
 
