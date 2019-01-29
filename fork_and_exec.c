@@ -7,7 +7,10 @@
 #include "parse.h"     /* Task struct */
 #include <fcntl.h>     /* open()      */
 
-static int redirect_output(char *outfile) 
+#define READ_SIDE 0
+#define WRITE_SIDE 1
+
+int check_and_redirect_output(char *outfile) 
 {
     unsigned int out_fd = 0;
 
@@ -28,7 +31,7 @@ static int redirect_output(char *outfile)
     return EXIT_SUCCESS;
 }
 
-static int redirect_input(char *infile) 
+int check_and_redirect_input(char *infile) 
 {
     unsigned int in_fd = 0;
 
@@ -46,42 +49,5 @@ static int redirect_input(char *infile)
             }
         }
     }
-    return EXIT_SUCCESS;
-}
-
-int execute_cmd(Parse *P, int t)
-{
-    pid_t pid;
-
-    pid = fork();
-
-    if (pid < 0) {
-        fprintf(stderr, "error -- failed to fork()");
-        exit(EXIT_FAILURE);
-    }
-
-    if (pid > 0) {
-        /* only executed by the PARENT process */
-        int child_ret;
-        waitpid(pid, &child_ret, 0);
-    } 
-    
-    else {
-        if (redirect_output(P->outfile)) {
-            printf("Failed to redirect output\n");
-            exit(EXIT_FAILURE);
-        }
-
-        if (redirect_input(P->infile)) {
-            printf("Failed to redirect input\n");
-            exit(EXIT_FAILURE);
-        }
-
-        if(execvp(P->tasks[t].cmd, P->tasks[t].argv)) {
-            printf("Failed to exec %s\n", P->tasks[t].cmd);
-            exit(EXIT_FAILURE);
-        }
-    }
-
     return EXIT_SUCCESS;
 }
