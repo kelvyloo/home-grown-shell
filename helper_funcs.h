@@ -1,5 +1,5 @@
-#ifndef _fork_and_exec_h_
-#define _fork_and_exec_h_
+#ifndef _helper_funcs__h_
+#define _helper_funcs__h_
 
 #include "parse.h"
 

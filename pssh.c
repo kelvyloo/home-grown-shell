@@ -7,7 +7,7 @@
 #include "builtin.h"
 #include "parse.h"
 
-#include "fork_and_exec.h"
+#include "helper_funcs.h"
 
 /*******************************************
  * Set to 1 to view the command line parse *
