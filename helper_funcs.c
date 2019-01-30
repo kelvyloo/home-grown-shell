@@ -10,7 +10,7 @@
 #define READ_SIDE 0
 #define WRITE_SIDE 1
 
-int check_and_redirect_output(char *outfile) 
+static int check_and_redirect_output(char *outfile) 
 {
     unsigned int out_fd = 0;
 
@@ -30,7 +30,7 @@ int check_and_redirect_output(char *outfile)
     return EXIT_SUCCESS;
 }
 
-int check_and_redirect_input(char *infile) 
+static int check_and_redirect_input(char *infile) 
 {
     unsigned int in_fd = 0;
 
@@ -90,7 +90,7 @@ int execute_cmd(Parse *P, unsigned int t)
         }
         close(pipe_fd[READ_SIDE]);
 
-        if (t == 0) {
+        if (t == (P->ntasks-1)) {
             if (check_and_redirect_output(P->outfile)) { return EXIT_FAILURE; }
         }
 
