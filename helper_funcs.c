@@ -21,11 +21,10 @@ int check_and_redirect_output(char *outfile)
             printf("pssh: failed to open/create file %s\n", outfile);
             return EXIT_FAILURE;
         }
-        else {
-            if (dup2(out_fd, STDOUT_FILENO) == -1) {
-                printf("pssh: failed to redirect output to %s\n", outfile);
-                return EXIT_FAILURE;
-            }
+
+        if (dup2(out_fd, STDOUT_FILENO) == -1) {
+            printf("pssh: failed to redirect output to %s\n", outfile);
+            return EXIT_FAILURE;
         }
     }
     return EXIT_SUCCESS;
@@ -42,11 +41,10 @@ int check_and_redirect_input(char *infile)
             printf("pssh: failed to open/create file %s\n", infile);
             return EXIT_FAILURE;
         }
-        else {
-            if (dup2(in_fd, STDIN_FILENO) == -1) {
-                printf("pssh: failed to redirect input to %s\n", infile);
-                return EXIT_FAILURE;
-            }
+
+        if (dup2(in_fd, STDIN_FILENO) == -1) {
+            printf("pssh: failed to redirect input to %s\n", infile);
+            return EXIT_FAILURE;
         }
     }
     return EXIT_SUCCESS;
