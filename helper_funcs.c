@@ -38,7 +38,7 @@ static int check_and_redirect_input(char *infile)
         in_fd = open(infile, O_RDONLY);
         
         if (in_fd == -1) {
-            printf("pssh: failed to open/create file %s\n", infile);
+            printf("pssh: failed to open file %s\n", infile);
             return EXIT_FAILURE;
         }
 
