@@ -93,6 +93,7 @@ void execute_tasks (Parse* P)
             int og_stdout = dup(STDOUT_FILENO);
             int og_stdin = dup(STDIN_FILENO);
 
+            /* Redirect std in/out */
             if (P->infile) {
                 check_and_redirect_input(P->infile);
             }
@@ -101,6 +102,7 @@ void execute_tasks (Parse* P)
             }
             builtin_execute (P->tasks[t]);
 
+            /* Restore std in/out */
             dup2(og_stdout, STDOUT_FILENO);
             dup2(og_stdin, STDIN_FILENO);
 

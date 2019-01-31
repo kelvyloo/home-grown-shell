@@ -34,11 +34,13 @@ void find_filepath(Task T)
 
     PATH = strdup(getenv("PATH"));
 
+    /* Look in the PATH env directories for cmd specified */
     for (tmp = PATH; ; tmp = NULL) {
         dir = strtok(tmp, ":");
 
         if (!dir) { break; }
 
+        /* Build string to test */
         strncpy(probe, dir, PATH_MAX);
         strncat(probe, "/", PATH_MAX);
         strncat(probe, *(T.argv + 1) , PATH_MAX);

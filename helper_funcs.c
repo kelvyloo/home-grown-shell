@@ -15,7 +15,7 @@ int check_and_redirect_output(char *outfile)
     unsigned int out_fd = 0;
 
     if (outfile != NULL) {
-        out_fd = open(outfile, O_CREAT | O_RDONLY | O_WRONLY, 0644);
+        out_fd = open(outfile, O_CREAT | O_WRONLY, 0644);
         
         if (out_fd == -1) {
             printf("pssh: failed to open/create file %s\n", outfile);
@@ -26,6 +26,7 @@ int check_and_redirect_output(char *outfile)
             printf("pssh: failed to redirect output to %s\n", outfile);
             return EXIT_FAILURE;
         }
+        close(out_fd);
     }
     return EXIT_SUCCESS;
 }
@@ -70,11 +71,13 @@ int execute_cmd(Parse *P, unsigned int t)
     }
 
     else if (pid > 0) {
+        /* Parent process */
         wait(NULL);
         close(pipe_fd[WRITE_SIDE]);
-        input_fd = pipe_fd[READ_SIDE];
+        input_fd = pipe_fd[READ_SIDE]; // Hold previous read fd for next task in multipipe
     }
     else {
+        /* Child process */
         if (t == 0) {
             if (check_and_redirect_input(P->infile)) { return EXIT_FAILURE; }
         }
@@ -84,6 +87,7 @@ int execute_cmd(Parse *P, unsigned int t)
         }
 
         if (t != (P->ntasks-1)) { 
+            /* If task is not the last one -> write to pipe not stdout */
             if (dup2(pipe_fd[WRITE_SIDE], STDOUT_FILENO) == -1) {
                 fprintf(stderr, "error -- dup2() failed for WRITE_SIDE -> STDOUT\n");
                 return EXIT_FAILURE;
