@@ -10,7 +10,7 @@
 #define READ_SIDE 0
 #define WRITE_SIDE 1
 
-static int check_and_redirect_output(char *outfile) 
+int check_and_redirect_output(char *outfile) 
 {
     unsigned int out_fd = 0;
 
@@ -30,7 +30,7 @@ static int check_and_redirect_output(char *outfile)
     return EXIT_SUCCESS;
 }
 
-static int check_and_redirect_input(char *infile) 
+int check_and_redirect_input(char *infile) 
 {
     unsigned int in_fd = 0;
 
@@ -46,6 +46,7 @@ static int check_and_redirect_input(char *infile)
             printf("pssh: failed to redirect input to %s\n", infile);
             return EXIT_FAILURE;
         }
+        close(in_fd);
     }
     return EXIT_SUCCESS;
 }

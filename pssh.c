@@ -90,7 +90,22 @@ void execute_tasks (Parse* P)
 
     for (t = 0; t < P->ntasks; t++) {
         if (is_builtin (P->tasks[t].cmd)) {
+            int og_stdout = dup(STDOUT_FILENO);
+            int og_stdin = dup(STDIN_FILENO);
+
+            if (P->infile) {
+                check_and_redirect_input(P->infile);
+            }
+            if (P->outfile) {
+                check_and_redirect_output(P->outfile);
+            }
             builtin_execute (P->tasks[t]);
+
+            dup2(og_stdout, STDOUT_FILENO);
+            dup2(og_stdin, STDIN_FILENO);
+
+            close(og_stdout);
+            close(og_stdin);
         }
         else if (command_found (P->tasks[t].cmd)) {
             if (execute_cmd(P, t)) {
