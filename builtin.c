@@ -44,7 +44,7 @@ void find_filepath(Task T)
         strncat(probe, *(T.argv + 1) , PATH_MAX);
 
         if (access(probe, X_OK) == 0) {
-            printf("%s\n", probe);
+            fprintf(stdout, "%s\n", probe);
             break;
         }
     }
@@ -58,11 +58,13 @@ void builtin_execute (Task T)
         exit (EXIT_SUCCESS);
     }
     if (!strcmp (T.cmd, "which")) {
-        if (is_builtin(*(T.argv + 1))) {
-            printf("%s: shell built-in command\n", *(T.argv + 1));
-        }
-        else {
-            find_filepath(T);
+        if (*(T.argv + 1) != NULL) {
+            if (is_builtin(*(T.argv + 1))) {
+                fprintf(stdout, "%s: shell built-in command\n", *(T.argv + 1));
+            }
+            else {
+                find_filepath(T);
+            }
         }
     }
     else {
