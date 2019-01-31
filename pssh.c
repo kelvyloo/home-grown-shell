@@ -34,7 +34,9 @@ static char* build_prompt ()
 {
     char cwd[PATH_MAX];
 
-    printf("%s", getcwd(cwd, PATH_MAX));
+    if (getcwd(cwd, PATH_MAX) != NULL) {
+        printf("%s", cwd);
+    }
 
     return  "$ ";
 }
@@ -99,7 +101,6 @@ void execute_tasks (Parse* P)
             printf ("pssh: command not found: %s\n", P->tasks[t].cmd);
             break;
         }
-
     }
 }
 
