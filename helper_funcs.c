@@ -78,12 +78,12 @@ int execute_cmd(Parse *P, unsigned int t)
     }
     else {
         /* Child process */
-        if (t == 0) {
-            if (check_and_redirect_input(P->infile)) { return EXIT_FAILURE; }
-        }
         if (dup2(input_fd, STDIN_FILENO) == -1) {
             fprintf(stderr, "error -- dup2() failed for input_fd -> STDIN\n");
             return EXIT_FAILURE;
+        }
+        if (t == 0) {
+            if (check_and_redirect_input(P->infile)) { return EXIT_FAILURE; }
         }
 
         if (t != (P->ntasks-1)) { 
