@@ -32,11 +32,12 @@ void print_banner ()
  *   be sure to free() it later when appropirate!  */
 static char* build_prompt ()
 {
-    char cwd[PATH_MAX];
+    char *cwd = NULL;
 
     if (getcwd(cwd, PATH_MAX) != NULL) {
         printf("%s", cwd);
     }
+    free(cwd);
 
     return  "$ ";
 }
