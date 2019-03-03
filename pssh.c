@@ -32,7 +32,7 @@ void print_banner ()
  *   be sure to free() it later when appropirate!  */
 static char* build_prompt ()
 {
-    char *cwd = NULL;
+    char *cwd = malloc(PATH_MAX);
 
     if (getcwd(cwd, PATH_MAX) != NULL) {
         printf("%s", cwd);
