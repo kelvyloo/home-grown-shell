@@ -81,6 +81,12 @@ static int command_found (const char* cmd)
     return ret;
 }
 
+#include <sys/wait.h>
+#include <fcntl.h>     /* open()      */
+
+#define READ_SIDE 0
+#define WRITE_SIDE 1
+
 /* Called upon receiving a successful parse.
  * This function is responsible for cycling through the
  * tasks, and forking, executing, etc as necessary to get
@@ -88,38 +94,68 @@ static int command_found (const char* cmd)
 void execute_tasks (Parse* P)
 {
     unsigned int t;
+    int stdin_fd = dup(STDIN_FILENO);
+    int stdout_fd = dup(STDOUT_FILENO);
+    int pipe_fd[2] = {0};
+    int input_fd = 0;
+    pid_t pid;
 
-    for (t = 0; t < P->ntasks; t++) {
-        if (is_builtin (P->tasks[t].cmd)) {
-            int og_stdout = dup(STDOUT_FILENO);
-            int og_stdin = dup(STDIN_FILENO);
-
-            /* Redirect std in/out */
-            if (P->infile) {
-                check_and_redirect_input(P->infile);
-            }
-            if (P->outfile) {
-                check_and_redirect_output(P->outfile);
-            }
-            builtin_execute (P->tasks[t]);
-
-            /* Restore std in/out */
-            dup2(og_stdout, STDOUT_FILENO);
-            dup2(og_stdin, STDIN_FILENO);
-
-            close(og_stdout);
-            close(og_stdin);
-        }
-        else if (command_found (P->tasks[t].cmd)) {
-            if (execute_cmd(P, t)) {
-                printf("pssh: failed to execute cmd: %s\n", P->tasks[t].cmd);
-            }
-        }
-        else {
-            printf ("pssh: command not found: %s\n", P->tasks[t].cmd);
-            break;
+    if (P->infile != NULL) {
+        input_fd = open(P->infile, O_RDONLY);
+        
+        if (input_fd == -1) {
+            fprintf(stderr, "pssh: failed to open file %s\n", P->infile);
         }
     }
+
+    for (t = 0; t < P->ntasks; t++) {
+        if (pipe(pipe_fd) == -1) {
+            fprintf(stderr, "pssh: failed to create pipe\n");
+            break;
+        }
+
+        pid = fork();
+
+        if (pid < 0) {
+            fprintf(stderr, "pssh: fork failed\n");
+            break;
+        }
+        else if (pid > 0) {
+            wait(NULL);
+            close(pipe_fd[WRITE_SIDE]);
+            input_fd = pipe_fd[READ_SIDE]; // Hold previous read fd for next task in multipipe
+        }
+        else {
+            if (dup2(input_fd, STDIN_FILENO) == -1) {
+                fprintf(stderr, "pssh: error -- dup2() failed\n");
+                break;
+            }
+            if (t < P->ntasks-1)
+                /* If task is not the last one -> write to pipe not stdout */
+                if (dup2(pipe_fd[WRITE_SIDE], STDOUT_FILENO) == -1) {
+                    fprintf(stderr, "pssh: error -- dup2() failed\n");
+                    break;
+                }
+            if (t == P->ntasks-1)
+                check_and_redirect_output(P->outfile);
+
+            if (is_builtin (P->tasks[t].cmd)) {
+                builtin_execute(P->tasks[t]);
+            }
+            else if (command_found (P->tasks[t].cmd)) {
+                execvp(P->tasks[t].cmd, P->tasks[t].argv);
+            }
+            else {
+                fprintf (stderr, "pssh: command not found: %s\n", P->tasks[t].cmd);
+                break;
+            }
+        }
+    }
+    dup2(stdin_fd, STDIN_FILENO);
+    dup2(stdout_fd, STDOUT_FILENO);
+
+    close(stdin_fd);
+    close(stdout_fd);
 }
 
 
