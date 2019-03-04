@@ -9,6 +9,7 @@
 static char* builtin[] = {
     "exit",   /* exits the shell */
     "which",  /* displays full path to command */
+    "kill",   /* send signal to process */
     NULL
 };
 
@@ -59,7 +60,7 @@ void builtin_execute (Task T)
     if (!strcmp (T.cmd, "exit")) {
         exit (EXIT_SUCCESS);
     }
-    if (!strcmp (T.cmd, "which")) {
+    else if (!strcmp (T.cmd, "which")) {
         if (*(T.argv + 1) != NULL) {
             if (is_builtin(*(T.argv + 1))) {
                 fprintf(stdout, "%s: shell built-in command\n", *(T.argv + 1));
