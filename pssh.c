@@ -2,12 +2,16 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/wait.h>
 #include <readline/readline.h>
 
 #include "builtin.h"
 #include "parse.h"
 
 #include "helper_funcs.h"
+
+#define READ_SIDE 0
+#define WRITE_SIDE 1
 
 /*******************************************
  * Set to 1 to view the command line parse *
@@ -79,30 +83,6 @@ static int command_found (const char* cmd)
 
     free (PATH);
     return ret;
-}
-
-#include <sys/wait.h>
-#include <fcntl.h>     /* open()      */
-
-#define READ_SIDE 0
-#define WRITE_SIDE 1
-
-int open_file(char *file)
-{
-    int fd;
-
-    fd = open(file, O_CREAT | O_RDWR, 0644);
-    
-    if (fd == -1)
-        fprintf(stderr, "pssh: failed to open file %s\n", file);
-
-    return fd;
-}
-
-void dup_files(int fd1, int fd2)
-{
-    if (dup2(fd1, fd2) == -1)
-        fprintf(stderr, "pssh: error -- dup2() failed\n");
 }
 
 /* Called upon receiving a successful parse.

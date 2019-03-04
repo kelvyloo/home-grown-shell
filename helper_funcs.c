@@ -1,108 +1,23 @@
 #include <stdio.h>
-#include <stdlib.h>
-#include <sys/types.h> /* pid_t                   */
-#include <sys/wait.h>  /* waitpid(), WEXITSTATUS()*/
-#include <unistd.h>    /* execvp(), fork()        */
+#include <sys/wait.h>
+#include <unistd.h>
+#include <fcntl.h>
 
-#include "parse.h"     /* Task struct */
-#include <fcntl.h>     /* open()      */
-
-#define READ_SIDE 0
-#define WRITE_SIDE 1
-
-int check_and_redirect_output(char *outfile) 
+int open_file(char *file)
 {
-    unsigned int out_fd = 0;
+    int fd;
 
-    if (outfile != NULL) {
-        out_fd = open(outfile, O_CREAT | O_WRONLY, 0644);
-        
-        if (out_fd == -1) {
-            printf("pssh: failed to open/create file %s\n", outfile);
-            return EXIT_FAILURE;
-        }
+    fd = open(file, O_CREAT | O_RDWR, 0644);
+    
+    if (fd == -1)
+        fprintf(stderr, "pssh: failed to open file %s\n", file);
 
-        if (dup2(out_fd, STDOUT_FILENO) == -1) {
-            printf("pssh: failed to redirect output to %s\n", outfile);
-            return EXIT_FAILURE;
-        }
-        close(out_fd);
-    }
-    return EXIT_SUCCESS;
+    return fd;
 }
 
-int check_and_redirect_input(char *infile) 
+void dup_files(int fd1, int fd2)
 {
-    unsigned int in_fd = 0;
-
-    if (infile != NULL) {
-        in_fd = open(infile, O_RDONLY);
-        
-        if (in_fd == -1) {
-            printf("pssh: failed to open file %s\n", infile);
-            return EXIT_FAILURE;
-        }
-
-        if (dup2(in_fd, STDIN_FILENO) == -1) {
-            printf("pssh: failed to redirect input to %s\n", infile);
-            return EXIT_FAILURE;
-        }
-        close(in_fd);
-    }
-    return EXIT_SUCCESS;
+    if (dup2(fd1, fd2) == -1)
+        fprintf(stderr, "pssh: error -- dup2() failed\n");
 }
 
-int execute_cmd(Parse *P, unsigned int t)
-{
-    int pipe_fd[2] = {0};
-    static int input_fd = 0;
-    pid_t pid;
-
-    if (pipe(pipe_fd) == -1) {
-        fprintf(stderr, "error -- failed to create pipe");
-        return EXIT_FAILURE;
-    }
-
-    pid = fork();
-
-    if (pid < 0) {
-        fprintf(stderr, "error -- failed to fork()");
-        return EXIT_FAILURE;
-    }
-
-    else if (pid > 0) {
-        /* Parent process */
-        wait(NULL);
-        close(pipe_fd[WRITE_SIDE]);
-        input_fd = pipe_fd[READ_SIDE]; // Hold previous read fd for next task in multipipe
-    }
-    else {
-        /* Child process */
-        if (dup2(input_fd, STDIN_FILENO) == -1) {
-            fprintf(stderr, "error -- dup2() failed for input_fd -> STDIN\n");
-            return EXIT_FAILURE;
-        }
-        if (t == 0) {
-            if (check_and_redirect_input(P->infile)) { return EXIT_FAILURE; }
-        }
-
-        if (t != (P->ntasks-1)) { 
-            /* If task is not the last one -> write to pipe not stdout */
-            if (dup2(pipe_fd[WRITE_SIDE], STDOUT_FILENO) == -1) {
-                fprintf(stderr, "error -- dup2() failed for WRITE_SIDE -> STDOUT\n");
-                return EXIT_FAILURE;
-            }
-        }
-        close(pipe_fd[READ_SIDE]);
-
-        if (t == (P->ntasks-1)) {
-            if (check_and_redirect_output(P->outfile)) { return EXIT_FAILURE; }
-        }
-
-        if (execvp(P->tasks[t].cmd, P->tasks[t].argv)) {
-            printf("Failed to exec %s\n", P->tasks[t].cmd);
-        }
-    }
-
-    return EXIT_SUCCESS;
-}
