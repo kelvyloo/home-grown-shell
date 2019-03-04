@@ -87,6 +87,24 @@ static int command_found (const char* cmd)
 #define READ_SIDE 0
 #define WRITE_SIDE 1
 
+int open_file(char *file)
+{
+    int fd;
+
+    fd = open(file, O_CREAT | O_RDWR, 0644);
+    
+    if (fd == -1)
+        fprintf(stderr, "pssh: failed to open file %s\n", file);
+
+    return fd;
+}
+
+void dup_files(int fd1, int fd2)
+{
+    if (dup2(fd1, fd2) == -1)
+        fprintf(stderr, "pssh: error -- dup2() failed\n");
+}
+
 /* Called upon receiving a successful parse.
  * This function is responsible for cycling through the
  * tasks, and forking, executing, etc as necessary to get
@@ -94,19 +112,13 @@ static int command_found (const char* cmd)
 void execute_tasks (Parse* P)
 {
     unsigned int t;
-    int stdin_fd = dup(STDIN_FILENO);
-    int stdout_fd = dup(STDOUT_FILENO);
     int pipe_fd[2] = {0};
     int input_fd = 0;
+    int out_fd = 0;
     pid_t pid;
 
-    if (P->infile != NULL) {
-        input_fd = open(P->infile, O_RDONLY);
-        
-        if (input_fd == -1) {
-            fprintf(stderr, "pssh: failed to open file %s\n", P->infile);
-        }
-    }
+    if (P->infile != NULL)
+        input_fd = open_file(P->infile);
 
     for (t = 0; t < P->ntasks; t++) {
         if (pipe(pipe_fd) == -1) {
@@ -123,21 +135,21 @@ void execute_tasks (Parse* P)
         else if (pid > 0) {
             wait(NULL);
             close(pipe_fd[WRITE_SIDE]);
-            input_fd = pipe_fd[READ_SIDE]; // Hold previous read fd for next task in multipipe
+             // Hold previous read fd for next task in multipipe
+            input_fd = pipe_fd[READ_SIDE];
         }
         else {
-            if (dup2(input_fd, STDIN_FILENO) == -1) {
-                fprintf(stderr, "pssh: error -- dup2() failed\n");
-                break;
-            }
+            dup_files(input_fd, STDIN_FILENO);
+
+            /* If task is not the last one -> write to pipe not stdout */
             if (t < P->ntasks-1)
-                /* If task is not the last one -> write to pipe not stdout */
-                if (dup2(pipe_fd[WRITE_SIDE], STDOUT_FILENO) == -1) {
-                    fprintf(stderr, "pssh: error -- dup2() failed\n");
-                    break;
-                }
-            if (t == P->ntasks-1)
-                check_and_redirect_output(P->outfile);
+                dup_files(pipe_fd[WRITE_SIDE], STDOUT_FILENO);
+
+            if (t == P->ntasks-1 && (P->outfile != NULL)) {
+                out_fd = open_file(P->outfile);
+
+                dup_files(out_fd, STDOUT_FILENO);
+            }
 
             if (is_builtin (P->tasks[t].cmd)) {
                 builtin_execute(P->tasks[t]);
@@ -151,11 +163,6 @@ void execute_tasks (Parse* P)
             }
         }
     }
-    dup2(stdin_fd, STDIN_FILENO);
-    dup2(stdout_fd, STDOUT_FILENO);
-
-    close(stdin_fd);
-    close(stdout_fd);
 }
 
 
