@@ -2,16 +2,12 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
-#include <sys/wait.h>
 #include <readline/readline.h>
 
 #include "builtin.h"
 #include "parse.h"
 
 #include "helper_funcs.h"
-
-#define READ_SIDE 0
-#define WRITE_SIDE 1
 
 /*******************************************
  * Set to 1 to view the command line parse *
@@ -92,59 +88,38 @@ static int command_found (const char* cmd)
 void execute_tasks (Parse* P)
 {
     unsigned int t;
-    int pipe_fd[2] = {0};
-    int input_fd = 0;
-    int out_fd = 0;
-    pid_t *pid = malloc(P->ntasks * sizeof(pid_t));
-
-    if (P->infile != NULL)
-        input_fd = open_file(P->infile);
 
     for (t = 0; t < P->ntasks; t++) {
-        if (pipe(pipe_fd) == -1) {
-            fprintf(stderr, "pssh: failed to create pipe\n");
-            break;
-        }
+        if (is_builtin (P->tasks[t].cmd)) {
+            int og_stdout = dup(STDOUT_FILENO);
+            int og_stdin = dup(STDIN_FILENO);
 
-        pid[t] = fork();
-        set_pgid(pid[t], pid[0]);
+            /* Redirect std in/out */
+            if (P->infile) {
+                check_and_redirect_input(P->infile);
+            }
+            if (P->outfile) {
+                check_and_redirect_output(P->outfile);
+            }
+            builtin_execute (P->tasks[t]);
 
-        if (pid[t] < 0) {
-            fprintf(stderr, "pssh: fork failed\n");
-            break;
+            /* Restore std in/out */
+            dup2(og_stdout, STDOUT_FILENO);
+            dup2(og_stdin, STDIN_FILENO);
+
+            close(og_stdout);
+            close(og_stdin);
         }
-        else if (pid[t] > 0) {
-            wait(NULL);
-            close(pipe_fd[WRITE_SIDE]);
-             // Hold previous read fd for next task in multipipe
-            input_fd = pipe_fd[READ_SIDE];
+        else if (command_found (P->tasks[t].cmd)) {
+            if (execute_cmd(P, t)) {
+                printf("pssh: failed to execute cmd: %s\n", P->tasks[t].cmd);
+            }
         }
         else {
-            dup_files(input_fd, STDIN_FILENO);
-
-            /* If task is not the last one -> write to pipe not stdout */
-            if (t < P->ntasks-1)
-                dup_files(pipe_fd[WRITE_SIDE], STDOUT_FILENO);
-
-            if (t == P->ntasks-1 && (P->outfile != NULL)) {
-                out_fd = open_file(P->outfile);
-
-                dup_files(out_fd, STDOUT_FILENO);
-            }
-
-            if (is_builtin (P->tasks[t].cmd)) {
-                builtin_execute(P->tasks[t]);
-            }
-            else if (command_found (P->tasks[t].cmd)) {
-                execvp(P->tasks[t].cmd, P->tasks[t].argv);
-            }
-            else {
-                fprintf (stderr, "pssh: command not found: %s\n", P->tasks[t].cmd);
-                break;
-            }
+            printf ("pssh: command not found: %s\n", P->tasks[t].cmd);
+            break;
         }
     }
-    free(pid);
 }
 
 
