@@ -52,29 +52,61 @@ int check_and_redirect_input(char *infile)
     return EXIT_SUCCESS;
 }
 
+int set_pgid(pid_t pid, pid_t pgid)
+{
+    if (setpgid(pid, pgid))
+        fprintf(stderr, "error -- setpgid() failed\n");
+
+    return 0;
+}
+
+int set_fg_pgid(pid_t pgid)
+{
+    void (*old)(int);
+
+    old = signal(SIGTTOU, SIG_IGN);
+
+    tcsetpgrp (STDIN_FILENO, pgid);
+    tcsetpgrp (STDOUT_FILENO, pgid);
+
+    signal (SIGTTOU, old);
+
+    return 0;
+}
+
 int execute_cmd(Parse *P, unsigned int t)
 {
     int pipe_fd[2] = {0};
     static int input_fd = 0;
-    pid_t pid;
+    pid_t *pid = malloc(P->ntasks * sizeof(pid_t));
 
     if (pipe(pipe_fd) == -1) {
         fprintf(stderr, "error -- failed to create pipe");
         return EXIT_FAILURE;
     }
 
-    pid = fork();
+    pid[t] = fork();
+    set_pgid(pid[t], pid[0]);
 
-    if (pid < 0) {
+    if (pid[t] < 0) {
         fprintf(stderr, "error -- failed to fork()");
         return EXIT_FAILURE;
     }
 
-    else if (pid > 0) {
+    else if (pid[t] > 0) {
+        if (!P->background) {
+            set_fg_pgid(pid[t]);
+        }
+        else {
+            set_fg_pgid(getpid());
+            printf("[%d] %d\n", t+1, pid[t]);
+        }
+
         /* Parent process */
         wait(NULL);
         close(pipe_fd[WRITE_SIDE]);
-        input_fd = pipe_fd[READ_SIDE]; // Hold previous read fd for next task in multipipe
+         // Hold previous read fd for next task in multipipe
+        input_fd = pipe_fd[READ_SIDE];
     }
     else {
         /* Child process */

@@ -32,4 +32,23 @@ int check_and_redirect_input(char *infile);
  */
 int execute_cmd(Parse *P, unsigned int t);
 
+typedef enum {
+    STOPPED,
+    TERM,
+    BG,
+    FG,
+} JobStatus;
+
+typedef struct {
+    char *name;
+    pid_t pid;
+    unsigned int npids;
+    pid_t pgid;
+    JobStatus status;
+} Job;
+
+int set_pgid(pid_t pid, pid_t pgid);
+
+int set_fg_pgid(pid_t pgid);
+
 #endif

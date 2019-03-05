@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <signal.h>
+#include <sys/wait.h>
 #include <readline/readline.h>
 
 #include "builtin.h"
@@ -122,6 +124,20 @@ void execute_tasks (Parse* P)
     }
 }
 
+void handler(int sig)
+{
+    int status;
+
+    waitpid(-1, &status, WNOHANG | WUNTRACED | WCONTINUED);
+
+    if (WIFSTOPPED(status)) {
+    }
+    else if (WIFCONTINUED(status)) {
+    }
+    else {
+        set_fg_pgid(getpgrp());
+    }
+}
 
 int main (int argc, char** argv)
 {
@@ -129,6 +145,7 @@ int main (int argc, char** argv)
     Parse* P;
 
     print_banner ();
+    signal(SIGCHLD, handler);
 
     while (1) {
         cmdline = readline (build_prompt());
