@@ -21,3 +21,8 @@ void dup_files(int fd1, int fd2)
         fprintf(stderr, "pssh: error -- dup2() failed\n");
 }
 
+void set_pgid(pid_t pid, pid_t pgid)
+{
+    if (setpgid(pid, pgid))
+        fprintf(stderr, "pssh: error -- setpgid() failed\n");
+}

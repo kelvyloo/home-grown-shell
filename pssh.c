@@ -95,7 +95,7 @@ void execute_tasks (Parse* P)
     int pipe_fd[2] = {0};
     int input_fd = 0;
     int out_fd = 0;
-    pid_t pid;
+    pid_t *pid = malloc(P->ntasks * sizeof(pid_t));
 
     if (P->infile != NULL)
         input_fd = open_file(P->infile);
@@ -106,13 +106,14 @@ void execute_tasks (Parse* P)
             break;
         }
 
-        pid = fork();
+        pid[t] = fork();
+        set_pgid(pid[t], pid[0]);
 
-        if (pid < 0) {
+        if (pid[t] < 0) {
             fprintf(stderr, "pssh: fork failed\n");
             break;
         }
-        else if (pid > 0) {
+        else if (pid[t] > 0) {
             wait(NULL);
             close(pipe_fd[WRITE_SIDE]);
              // Hold previous read fd for next task in multipipe
@@ -143,6 +144,7 @@ void execute_tasks (Parse* P)
             }
         }
     }
+    free(pid);
 }
 
 

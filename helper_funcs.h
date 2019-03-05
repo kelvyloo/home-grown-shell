@@ -5,4 +5,6 @@ int open_file(char *file);
 
 void dup_files(int fd1, int fd2);
 
+void set_pgid(pid_t pid, pid_t pgid);
+
 #endif
