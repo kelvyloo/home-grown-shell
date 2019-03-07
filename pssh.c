@@ -111,6 +111,7 @@ void execute_tasks (Parse* P)
     jobs++;
 
     input_fd = og_stdin;
+    output_fd = og_stdout;
 
     if (P->infile) {
         input_fd = open(P->infile, O_RDONLY, 0644);
@@ -121,9 +122,10 @@ void execute_tasks (Parse* P)
         pipe(pipe_fd);
         output_fd = pipe_fd[WRITE_SIDE];
 
-        if (is_builtin(P->tasks[t].cmd))
+        if (is_builtin(P->tasks[t].cmd)) {
+            dup2(output_fd, STDOUT_FILENO);
             builtin_execute(P->tasks[t]);
-
+        }
         else if (command_found(P->tasks[t].cmd)) {
             pid[t] = fork();
             setpgid(pid[t], pid[0]);
@@ -146,20 +148,18 @@ void execute_tasks (Parse* P)
                 execvp(P->tasks[t].cmd, P->tasks[t].argv);
             }
         }
-
         else
             printf("pssh: does not exist\n");
     }
-
-    output_fd = og_stdout;
 
     if (P->outfile)
         output_fd = open(P->outfile, O_CREAT | O_WRONLY, 0644);
 
     /* Run last (or only) process of the job */
-    if (is_builtin(P->tasks[t].cmd))
+    if (is_builtin(P->tasks[t].cmd)) {
+        dup2(output_fd, STDOUT_FILENO);
         builtin_execute(P->tasks[t]);
-
+    }
     else if (command_found(P->tasks[t].cmd)) {
         pid[t] = fork();
         setpgid(pid[t], pid[0]);
@@ -177,21 +177,13 @@ void execute_tasks (Parse* P)
             dup2(input_fd, STDIN_FILENO);
             dup2(output_fd, STDOUT_FILENO);
             execvp(P->tasks[t].cmd, P->tasks[t].argv);
-
         }
     }
-
     else 
         printf("pssh: does not exist\n");
 
-    if (P->background) {
-        printf("[%d] ", jobs);
-
-        for (t = 0; t < P->ntasks; t++)
-            printf("%d ", job.pid[t]);
-
-        printf("\n");
-    }
+    if (P->background)
+        print_background_job(jobs, &job);
 
 #if 0
     /* DEBUGGING SHIT */
@@ -241,6 +233,10 @@ void handler(int sig)
 
         if (proc_killed == job.npids) {
             set_fg_pgid(getpgrp());
+
+            if (job.status == BG)
+                printf("\n[%d]+ Done \t%s\n", jobs, job.name);
+
             jobs--;
             proc_killed = 0;
         }
