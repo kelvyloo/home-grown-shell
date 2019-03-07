@@ -163,6 +163,13 @@ void execute_tasks (Parse* P)
         setpgid(pid[t], pid[0]);
         set_fg_pgid(pid[0]);
 
+        if (t == 0) {
+            job.name = P->tasks[0].cmd;
+            job.npids = P->ntasks;
+            job.pgid = pid[0];
+            job.pid[0] = job.pgid;
+        }
+
         job.pid[t] = pid[t];
 
         if (pid[t] == 0) {
