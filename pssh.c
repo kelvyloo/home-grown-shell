@@ -92,6 +92,7 @@ static int command_found (const char* cmd)
 #define WRITE_SIDE 1
 
 Job job;
+int jobs = 0;
 
 /* Called upon receiving a successful parse.
  * This function is responsible for cycling through the
@@ -107,7 +108,15 @@ void execute_tasks (Parse* P)
     int og_stdin = dup(STDIN_FILENO);
     int og_stdout = dup(STDOUT_FILENO);
 
+    jobs++;
+
     input_fd = og_stdin;
+
+    if (P->background)
+        printf("[%d] ", jobs);
+
+    if (P->ntasks == 1)
+        create_job(&job, P, getpgrp());
 
     if (P->infile) {
         input_fd = open(P->infile, O_RDONLY, 0644);
@@ -126,13 +135,8 @@ void execute_tasks (Parse* P)
             setpgid(pid[t], pid[0]);
             set_fg_pgid(pid[0]);
 
-            if (t == 0) {
-                job.name = P->tasks[0].cmd;
-                job.npids = P->ntasks;
-                job.pgid = pid[0];
-                job.pid[0] = job.pgid;
-                job.status = (P->background) ? BG : FG;
-            }
+            if (t == 0)
+                create_job(&job, P, pid[0]);
 
             if (pid[t] == 0) {
                 dup2(input_fd, STDIN_FILENO);
@@ -156,14 +160,6 @@ void execute_tasks (Parse* P)
     if (P->outfile)
         output_fd = open(P->outfile, O_CREAT | O_WRONLY, 0644);
 
-    if (t == 0) {
-        job.name = P->tasks[t].cmd;
-        job.npids = P->ntasks;
-        job.pgid = getpgrp();
-        job.pid[t] = job.pgid;
-        job.status = (P->background) ? BG : FG;
-    }
-
     if (is_builtin(P->tasks[t].cmd))
         builtin_execute(P->tasks[t]);
 
@@ -175,6 +171,10 @@ void execute_tasks (Parse* P)
         job.pid[t] = pid[t];
 
         if (pid[t] == 0) {
+            if (P->background) {
+                setsid();
+            }
+
             dup2(input_fd, STDIN_FILENO);
             dup2(output_fd, STDOUT_FILENO);
             execvp(P->tasks[t].cmd, P->tasks[t].argv);
@@ -184,11 +184,20 @@ void execute_tasks (Parse* P)
     else 
         printf("pssh: does not exist\n");
 
+    if (P->background)
+        printf("%d\n", job.pid[t]);
+
+#if 0
+    /* DEBUGGING SHIT */
+    printf("---------------------------------\n");
     printf("JOB NAME: %s | PGID: %d | Num proc: %d | Status %d\n", 
             job.name, job.pgid, job.npids, job.status);
 
     for (t = 0; t < P->ntasks; t++)
         printf("pid %d\n", job.pid[t]);
+
+    printf("---------------------------------\n");
+#endif
 
     /* Restore stdin & out */
     dup2(og_stdin, STDIN_FILENO);
@@ -226,8 +235,12 @@ void handler(int sig)
 
         if (proc_killed == job.npids) {
             set_fg_pgid(getpgrp());
+            jobs--;
             proc_killed = 0;
         }
+
+        if (job.status == BG)
+            set_fg_pgid(getpgrp());
     }
 }
 
