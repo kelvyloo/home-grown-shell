@@ -3,13 +3,18 @@
 #include <string.h>
 #include <unistd.h>
 #include <signal.h>
-#include <sys/wait.h>
 #include <readline/readline.h>
+
+#include <sys/wait.h>
+#include <fcntl.h>
+#include <sys/types.h>
 
 #include "builtin.h"
 #include "parse.h"
 
 #include "helper_funcs.h"
+
+#define MAX_JOBS 100
 
 /*******************************************
  * Set to 1 to view the command line parse *
@@ -37,11 +42,11 @@ static char* build_prompt ()
     char *cwd = malloc(PATH_MAX);
 
     if (getcwd(cwd, PATH_MAX) != NULL) {
-        printf("%s", cwd);
+        sprintf(cwd, "%s$ ", cwd);
     }
     free(cwd);
 
-    return  "$ ";
+    return cwd;
 }
 
 
@@ -83,50 +88,146 @@ static int command_found (const char* cmd)
     return ret;
 }
 
+#define READ_SIDE 0
+#define WRITE_SIDE 1
+
+Job job;
+int jobs = 0;
+
 /* Called upon receiving a successful parse.
  * This function is responsible for cycling through the
  * tasks, and forking, executing, etc as necessary to get
  * the job done! */
 void execute_tasks (Parse* P)
 {
-    unsigned int t;
+    int t = 0;
+    int input_fd, output_fd;
+    int pipe_fd[2];
+    pid_t *pid = malloc(P->ntasks * sizeof(pid_t));
 
-    for (t = 0; t < P->ntasks; t++) {
-        if (is_builtin (P->tasks[t].cmd)) {
-            int og_stdout = dup(STDOUT_FILENO);
-            int og_stdin = dup(STDIN_FILENO);
+    int og_stdin = dup(STDIN_FILENO);
+    int og_stdout = dup(STDOUT_FILENO);
 
-            /* Redirect std in/out */
-            if (P->infile) {
-                check_and_redirect_input(P->infile);
+    jobs++;
+
+    input_fd = og_stdin;
+
+    if (P->infile) {
+        input_fd = open(P->infile, O_RDONLY, 0644);
+        dup2(input_fd, STDIN_FILENO);
+    }
+
+    for (t = 0; t < (P->ntasks-1); t++) {
+        pipe(pipe_fd);
+        output_fd = pipe_fd[WRITE_SIDE];
+
+        if (is_builtin(P->tasks[t].cmd))
+            builtin_execute(P->tasks[t]);
+
+        else if (command_found(P->tasks[t].cmd)) {
+            pid[t] = fork();
+            setpgid(pid[t], pid[0]);
+
+            /* Parent process*/
+            if (pid[t] > 0) {
+                input_fd = pipe_fd[READ_SIDE];
+                close(pipe_fd[WRITE_SIDE]);
+
+                if (t == 0)
+                    create_job(&job, P, pid[0]);
+
+                job.pid[t] = pid[t];
+                set_fg_pgid((!P->background) ? job.pgid : getpgrp());
             }
-            if (P->outfile) {
-                check_and_redirect_output(P->outfile);
+            /* Child process */
+            else if (pid[t] == 0) {
+                dup2(input_fd, STDIN_FILENO);
+                dup2(output_fd, STDOUT_FILENO);
+                execvp(P->tasks[t].cmd, P->tasks[t].argv);
             }
-            builtin_execute (P->tasks[t]);
-
-            /* Restore std in/out */
-            dup2(og_stdout, STDOUT_FILENO);
-            dup2(og_stdin, STDIN_FILENO);
-
-            close(og_stdout);
-            close(og_stdin);
         }
-        else if (command_found (P->tasks[t].cmd)) {
-            if (execute_cmd(P, t)) {
-                printf("pssh: failed to execute cmd: %s\n", P->tasks[t].cmd);
-            }
+
+        else
+            printf("pssh: does not exist\n");
+    }
+
+    output_fd = og_stdout;
+
+    if (P->outfile)
+        output_fd = open(P->outfile, O_CREAT | O_WRONLY, 0644);
+
+    if (is_builtin(P->tasks[t].cmd))
+        builtin_execute(P->tasks[t]);
+
+    else if (command_found(P->tasks[t].cmd)) {
+        pid[t] = fork();
+        setpgid(pid[t], pid[0]);
+
+        /* Parent process */
+        if (pid[t] > 0) {
+            if (t == 0)
+                create_job(&job, P, pid[0]);
+
+            job.pid[t] = pid[t];
+            set_fg_pgid((!P->background) ? job.pgid : getpgrp());
         }
-        else {
-            printf ("pssh: command not found: %s\n", P->tasks[t].cmd);
-            break;
+        /* Child process */
+        else if (pid[t] == 0) {
+            dup2(input_fd, STDIN_FILENO);
+            dup2(output_fd, STDOUT_FILENO);
+            execvp(P->tasks[t].cmd, P->tasks[t].argv);
+
         }
     }
+
+    else 
+        printf("pssh: does not exist\n");
+
+    if (P->background) {
+        printf("[%d] ", jobs);
+
+        for (t = 0; t < P->ntasks; t++)
+            printf("%d ", job.pid[t]);
+
+        printf("\n");
+    }
+
+#if 0
+    /* DEBUGGING SHIT */
+    printf("---------------------------------\n");
+    printf("JOB NAME: %s | PGID: %d | Num proc: %d | Status %d\n", 
+            job.name, job.pgid, job.npids, job.status);
+
+    for (t = 0; t < P->ntasks; t++)
+        printf("pid %d\n", job.pid[t]);
+
+    printf("---------------------------------\n");
+#endif
+
+    /* Restore stdin & out */
+    dup2(og_stdin, STDIN_FILENO);
+    dup2(og_stdout, STDOUT_FILENO);
+
+    close(og_stdin);
+    close(og_stdout);
+}
+
+void handler_sigttou (int sig)
+{
+    while (tcgetpgrp(STDOUT_FILENO) != getpid ())
+        pause ();
+}
+
+void handler_sigttin (int sig)
+{
+    while (tcgetpgrp(STDIN_FILENO) != getpid ())
+        pause ();
 }
 
 void handler(int sig)
 {
     int status;
+    static int proc_killed;
 
     waitpid(-1, &status, WNOHANG | WUNTRACED | WCONTINUED);
 
@@ -135,7 +236,13 @@ void handler(int sig)
     else if (WIFCONTINUED(status)) {
     }
     else {
-        set_fg_pgid(getpgrp());
+        proc_killed++;
+
+        if (proc_killed == job.npids) {
+            set_fg_pgid(getpgrp());
+            jobs--;
+            proc_killed = 0;
+        }
     }
 }
 
@@ -145,7 +252,10 @@ int main (int argc, char** argv)
     Parse* P;
 
     print_banner ();
+
     signal(SIGCHLD, handler);
+    signal(SIGTTOU, handler_sigttou);
+    signal(SIGTTIN, handler_sigttin);
 
     while (1) {
         cmdline = readline (build_prompt());
