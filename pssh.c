@@ -131,6 +131,7 @@ void execute_tasks (Parse* P)
                 job.npids = P->ntasks;
                 job.pgid = pid[0];
                 job.pid[0] = job.pgid;
+                job.status = (P->background) ? BG : FG;
             }
 
             if (pid[t] == 0) {
@@ -155,6 +156,14 @@ void execute_tasks (Parse* P)
     if (P->outfile)
         output_fd = open(P->outfile, O_CREAT | O_WRONLY, 0644);
 
+    if (t == 0) {
+        job.name = P->tasks[t].cmd;
+        job.npids = P->ntasks;
+        job.pgid = getpgrp();
+        job.pid[t] = job.pgid;
+        job.status = (P->background) ? BG : FG;
+    }
+
     if (is_builtin(P->tasks[t].cmd))
         builtin_execute(P->tasks[t]);
 
@@ -162,13 +171,6 @@ void execute_tasks (Parse* P)
         pid[t] = fork();
         setpgid(pid[t], pid[0]);
         set_fg_pgid(pid[0]);
-
-        if (t == 0) {
-            job.name = P->tasks[0].cmd;
-            job.npids = P->ntasks;
-            job.pgid = pid[0];
-            job.pid[0] = job.pgid;
-        }
 
         job.pid[t] = pid[t];
 
@@ -182,8 +184,8 @@ void execute_tasks (Parse* P)
     else 
         printf("pssh: does not exist\n");
 
-    printf("JOB NAME: %s | PGID: %d | Num proc: %d\n", 
-            job.name, job.pgid, job.npids);
+    printf("JOB NAME: %s | PGID: %d | Num proc: %d | Status %d\n", 
+            job.name, job.pgid, job.npids, job.status);
 
     for (t = 0; t < P->ntasks; t++)
         printf("pid %d\n", job.pid[t]);
@@ -222,8 +224,10 @@ void handler(int sig)
     else {
         proc_killed++;
 
-        if (proc_killed == job.npids)
+        if (proc_killed == job.npids) {
             set_fg_pgid(getpgrp());
+            proc_killed = 0;
+        }
     }
 }
 
