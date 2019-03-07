@@ -31,8 +31,8 @@ typedef enum {
 
 typedef struct {
     char *name;
-    pid_t *pid;
-    unsigned int npids;
+    pid_t pid[10];
+    int npids;
     pid_t pgid;
     JobStatus status;
 } Job;

@@ -91,6 +91,8 @@ static int command_found (const char* cmd)
 #define READ_SIDE 0
 #define WRITE_SIDE 1
 
+Job job;
+
 /* Called upon receiving a successful parse.
  * This function is responsible for cycling through the
  * tasks, and forking, executing, etc as necessary to get
@@ -124,6 +126,13 @@ void execute_tasks (Parse* P)
             setpgid(pid[t], pid[0]);
             set_fg_pgid(pid[0]);
 
+            if (t == 0) {
+                job.name = P->tasks[0].cmd;
+                job.npids = P->ntasks;
+                job.pgid = pid[0];
+                job.pid[0] = job.pgid;
+            }
+
             if (pid[t] == 0) {
                 dup2(input_fd, STDIN_FILENO);
                 dup2(output_fd, STDOUT_FILENO);
@@ -133,6 +142,7 @@ void execute_tasks (Parse* P)
             else if (pid[t] > 0) {
                 input_fd = pipe_fd[READ_SIDE];
                 close(pipe_fd[WRITE_SIDE]);
+                job.pid[t] = pid[t];
             }
         }
 
@@ -153,6 +163,8 @@ void execute_tasks (Parse* P)
         setpgid(pid[t], pid[0]);
         set_fg_pgid(pid[0]);
 
+        job.pid[t] = pid[t];
+
         if (pid[t] == 0) {
             dup2(input_fd, STDIN_FILENO);
             dup2(output_fd, STDOUT_FILENO);
@@ -162,6 +174,12 @@ void execute_tasks (Parse* P)
 
     else 
         printf("pssh: does not exist\n");
+
+    printf("JOB NAME: %s | PGID: %d | Num proc: %d\n", 
+            job.name, job.pgid, job.npids);
+
+    for (t = 0; t < P->ntasks; t++)
+        printf("pid %d\n", job.pid[t]);
 
     /* Restore stdin & out */
     dup2(og_stdin, STDIN_FILENO);
@@ -186,6 +204,7 @@ void handler_sigttin (int sig)
 void handler(int sig)
 {
     int status;
+    static int proc_killed;
 
     waitpid(-1, &status, WNOHANG | WUNTRACED | WCONTINUED);
 
@@ -194,7 +213,10 @@ void handler(int sig)
     else if (WIFCONTINUED(status)) {
     }
     else {
-        set_fg_pgid(getpid());
+        proc_killed++;
+
+        if (proc_killed == job.npids)
+            set_fg_pgid(getpgrp());
     }
 }
 
