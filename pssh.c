@@ -3,8 +3,11 @@
 #include <string.h>
 #include <unistd.h>
 #include <signal.h>
-#include <sys/wait.h>
 #include <readline/readline.h>
+
+#include <sys/wait.h>
+#include <fcntl.h>
+#include <sys/types.h>
 
 #include "builtin.h"
 #include "parse.h"
@@ -85,48 +88,87 @@ static int command_found (const char* cmd)
     return ret;
 }
 
+#define READ_SIDE 0
+#define WRITE_SIDE 1
+
 /* Called upon receiving a successful parse.
  * This function is responsible for cycling through the
  * tasks, and forking, executing, etc as necessary to get
  * the job done! */
 void execute_tasks (Parse* P)
 {
-    if (P->infile)
-        input_fd = open(P->infile);
+    int t = 0;
+    int input_fd, output_fd;
+    int pipe_fd[2];
+    pid_t *pid = malloc(P->ntasks * sizeof(pid_t));
 
-    for task in jobs-1
-        pipe(fd);
-        output_fd = write_pipe;
+    int og_stdin = dup(STDIN_FILENO);
+    int og_stdout = dup(STDOUT_FILENO);
 
-        if (builtin)
-            execute_builtin();
+    input_fd = og_stdin;
 
-        else if (command_found)
-            pid = fork();
+    if (P->infile) {
+        input_fd = open(P->infile, O_RDONLY, 0644);
+        dup2(input_fd, STDIN_FILENO);
+    }
 
-            if (child)
-                dup2(input_fd, stdin);
-                dup2(output_fd, stdout);
-                execvp();
+    for (t = 0; t < (P->ntasks-1); t++) {
+        pipe(pipe_fd);
+        output_fd = pipe_fd[WRITE_SIDE];
 
-            else if (parent)
-                read = prev_read;
-                close(write_pipe);
+        if (is_builtin(P->tasks[t].cmd))
+            builtin_execute(P->tasks[t]);
+
+        else if (command_found(P->tasks[t].cmd)) {
+            pid[t] = fork();
+            setpgid(pid[t], pid[0]);
+            set_fg_pgid(pid[0]);
+
+            if (pid[t] == 0) {
+                dup2(input_fd, STDIN_FILENO);
+                dup2(output_fd, STDOUT_FILENO);
+                execvp(P->tasks[t].cmd, P->tasks[t].argv);
+            }
+
+            else if (pid[t] > 0) {
+                input_fd = pipe_fd[READ_SIDE];
+                close(pipe_fd[WRITE_SIDE]);
+            }
+        }
 
         else
-            printf("Does not exist");
+            printf("pssh: does not exist\n");
+    }
+
+    output_fd = og_stdout;
 
     if (P->outfile)
-        output_fd = open(P->infile);
+        output_fd = open(P->outfile, O_CREAT | O_WRONLY, 0644);
 
-    if (builtin)
-        execute_builtin();
+    if (is_builtin(P->tasks[t].cmd))
+        builtin_execute(P->tasks[t]);
 
-    else if (command_found)
-        execvp();
+    else if (command_found(P->tasks[t].cmd)) {
+        pid[t] = fork();
+        setpgid(pid[t], pid[0]);
+        set_fg_pgid(pid[0]);
+
+        if (pid[t] == 0) {
+            dup2(input_fd, STDIN_FILENO);
+            dup2(output_fd, STDOUT_FILENO);
+            execvp(P->tasks[t].cmd, P->tasks[t].argv);
+        }
+    }
 
     else 
-        printf("Does not exist");
+        printf("pssh: does not exist\n");
+
+    /* Restore stdin & out */
+    dup2(og_stdin, STDIN_FILENO);
+    dup2(og_stdout, STDOUT_FILENO);
+
+    close(og_stdin);
+    close(og_stdout);
 }
 
 void handler_sigttou (int sig)
@@ -152,6 +194,7 @@ void handler(int sig)
     else if (WIFCONTINUED(status)) {
     }
     else {
+        set_fg_pgid(getpid());
     }
 }
 
