@@ -29,3 +29,15 @@ void set_fg_pgid(pid_t pgid)
 
     signal (SIGTTOU, old);
 }
+
+void print_background_job(int job_num, Job *job)
+{
+    int t;
+
+    printf("[%d] ", job_num);
+
+    for (t = 0; t < job->npids; t++)
+        printf("%d ", job->pid[t]);
+
+    printf("\n");
+}
