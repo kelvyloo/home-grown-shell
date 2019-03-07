@@ -11,6 +11,8 @@
 
 #include "helper_funcs.h"
 
+#define MAX_JOBS 100
+
 /*******************************************
  * Set to 1 to view the command line parse *
  *******************************************/
@@ -37,11 +39,11 @@ static char* build_prompt ()
     char *cwd = malloc(PATH_MAX);
 
     if (getcwd(cwd, PATH_MAX) != NULL) {
-        printf("%s", cwd);
+        sprintf(cwd, "%s$ ", cwd);
     }
     free(cwd);
 
-    return  "$ ";
+    return cwd;
 }
 
 
@@ -89,39 +91,54 @@ static int command_found (const char* cmd)
  * the job done! */
 void execute_tasks (Parse* P)
 {
-    unsigned int t;
+    if (P->infile)
+        input_fd = open(P->infile);
 
-    for (t = 0; t < P->ntasks; t++) {
-        if (is_builtin (P->tasks[t].cmd)) {
-            int og_stdout = dup(STDOUT_FILENO);
-            int og_stdin = dup(STDIN_FILENO);
+    for task in jobs-1
+        pipe(fd);
+        output_fd = write_pipe;
 
-            /* Redirect std in/out */
-            if (P->infile) {
-                check_and_redirect_input(P->infile);
-            }
-            if (P->outfile) {
-                check_and_redirect_output(P->outfile);
-            }
-            builtin_execute (P->tasks[t]);
+        if (builtin)
+            execute_builtin();
 
-            /* Restore std in/out */
-            dup2(og_stdout, STDOUT_FILENO);
-            dup2(og_stdin, STDIN_FILENO);
+        else if (command_found)
+            pid = fork();
 
-            close(og_stdout);
-            close(og_stdin);
-        }
-        else if (command_found (P->tasks[t].cmd)) {
-            if (execute_cmd(P, t)) {
-                printf("pssh: failed to execute cmd: %s\n", P->tasks[t].cmd);
-            }
-        }
-        else {
-            printf ("pssh: command not found: %s\n", P->tasks[t].cmd);
-            break;
-        }
-    }
+            if (child)
+                dup2(input_fd, stdin);
+                dup2(output_fd, stdout);
+                execvp();
+
+            else if (parent)
+                read = prev_read;
+                close(write_pipe);
+
+        else
+            printf("Does not exist");
+
+    if (P->outfile)
+        output_fd = open(P->infile);
+
+    if (builtin)
+        execute_builtin();
+
+    else if (command_found)
+        execvp();
+
+    else 
+        printf("Does not exist");
+}
+
+void handler_sigttou (int sig)
+{
+    while (tcgetpgrp(STDOUT_FILENO) != getpid ())
+        pause ();
+}
+
+void handler_sigttin (int sig)
+{
+    while (tcgetpgrp(STDIN_FILENO) != getpid ())
+        pause ();
 }
 
 void handler(int sig)
@@ -135,7 +152,6 @@ void handler(int sig)
     else if (WIFCONTINUED(status)) {
     }
     else {
-        set_fg_pgid(getpgrp());
     }
 }
 
@@ -145,7 +161,10 @@ int main (int argc, char** argv)
     Parse* P;
 
     print_banner ();
+
     signal(SIGCHLD, handler);
+    signal(SIGTTOU, handler_sigttou);
+    signal(SIGTTIN, handler_sigttin);
 
     while (1) {
         cmdline = readline (build_prompt());

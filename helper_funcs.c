@@ -6,6 +6,8 @@
 
 #include "parse.h"     /* Task struct */
 #include <fcntl.h>     /* open()      */
+#include "helper_funcs.h"
+#include <string.h>
 
 #define READ_SIDE 0
 #define WRITE_SIDE 1
@@ -52,15 +54,38 @@ int check_and_redirect_input(char *infile)
     return EXIT_SUCCESS;
 }
 
-int set_pgid(pid_t pid, pid_t pgid)
+void set_job_name(Job *job, Task task)
+{
+    job->name = task.cmd;
+}
+
+void set_job_status(Job *job, JobStatus status)
+{
+    job->status = status;
+}
+
+void set_job_npids(Job *job, unsigned int npids)
+{
+    job->npids = npids;
+}
+
+void set_job_pgid(Job *job, pid_t pgid)
+{
+    job->pgid = pgid;
+}
+
+void set_job_pid(Job *job, unsigned int t, pid_t pid)
+{
+    job->pid[t] = pid;
+}
+
+void set_pgid(pid_t pid, pid_t pgid)
 {
     if (setpgid(pid, pgid))
         fprintf(stderr, "error -- setpgid() failed\n");
-
-    return 0;
 }
 
-int set_fg_pgid(pid_t pgid)
+void set_fg_pgid(pid_t pgid)
 {
     void (*old)(int);
 
@@ -70,42 +95,31 @@ int set_fg_pgid(pid_t pgid)
     tcsetpgrp (STDOUT_FILENO, pgid);
 
     signal (SIGTTOU, old);
-
-    return 0;
 }
 
-int execute_cmd(Parse *P, unsigned int t)
+int execute_cmd(Parse *P, unsigned int t, Job *job, pid_t *pid)
 {
     int pipe_fd[2] = {0};
     static int input_fd = 0;
-    pid_t *pid = malloc(P->ntasks * sizeof(pid_t));
 
     if (pipe(pipe_fd) == -1) {
         fprintf(stderr, "error -- failed to create pipe");
         return EXIT_FAILURE;
     }
 
-    pid[t] = fork();
-    set_pgid(pid[t], pid[0]);
+    *pid = fork();
+    set_pgid(*pid, *pid);
 
-    if (pid[t] < 0) {
+    if (*pid < 0) {
         fprintf(stderr, "error -- failed to fork()");
         return EXIT_FAILURE;
     }
 
-    else if (pid[t] > 0) {
-        if (!P->background) {
-            set_fg_pgid(pid[t]);
-        }
-        else {
-            set_fg_pgid(getpid());
-            printf("[%d] %d\n", t+1, pid[t]);
-        }
-
-        /* Parent process */
-        wait(NULL);
+    else if (*pid > 0) {
+        set_fg_pgid(job->pgid);
+        printf("FG pgid: %d\n", tcgetpgrp(STDOUT_FILENO));
         close(pipe_fd[WRITE_SIDE]);
-         // Hold previous read fd for next task in multipipe
+        // Hold previous read fd for next task in multipipe
         input_fd = pipe_fd[READ_SIDE];
     }
     else {
