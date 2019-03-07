@@ -1,16 +1,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h> /* pid_t                   */
-#include <sys/wait.h>  /* waitpid(), WEXITSTATUS()*/
 #include <unistd.h>    /* execvp(), fork()        */
-
+#include <signal.h>
 #include "parse.h"     /* Task struct */
 #include <fcntl.h>     /* open()      */
 #include "helper_funcs.h"
-#include <string.h>
 
 void create_job(Job *job, Parse *P, pid_t pgid)
 {
+    job->pid = malloc(P->ntasks * sizeof(pid_t));
+
     job->name = P->tasks[0].cmd;
     job->npids = P->ntasks;
     job->pgid = pgid;

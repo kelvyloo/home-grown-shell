@@ -12,7 +12,7 @@ typedef enum {
 
 typedef struct {
     char *name;
-    pid_t pid[10];
+    pid_t *pid;
     int npids;
     pid_t pgid;
     JobStatus status;
