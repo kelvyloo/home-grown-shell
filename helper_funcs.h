@@ -22,6 +22,6 @@ void create_job(Job *job, Parse *P, pid_t pgid);
 
 void set_fg_pgid(pid_t pgid);
 
-void print_background_job(int job_num, Job *job);
+void print_background_job(int job_num, Job *job, int done);
 
 #endif
