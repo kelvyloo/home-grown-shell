@@ -9,6 +9,15 @@
 #include "helper_funcs.h"
 #include <string.h>
 
+void create_job(Job *job, Parse *P, pid_t pgid)
+{
+    job->name = P->tasks[0].cmd;
+    job->npids = P->ntasks;
+    job->pgid = pgid;
+    job->pid[0] = job->pgid;
+    job->status = (P->background) ? BG : FG;
+}
+
 void set_fg_pgid(pid_t pgid)
 {
     void (*old)(int);

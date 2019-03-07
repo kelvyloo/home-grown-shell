@@ -18,6 +18,8 @@ typedef struct {
     JobStatus status;
 } Job;
 
+void create_job(Job *job, Parse *P, pid_t pgid);
+
 void set_fg_pgid(pid_t pgid);
 
 #endif
