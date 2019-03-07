@@ -112,12 +112,6 @@ void execute_tasks (Parse* P)
 
     input_fd = og_stdin;
 
-    if (P->background)
-        printf("[%d] ", jobs);
-
-    if (P->ntasks == 1)
-        create_job(&job, P, getpgrp());
-
     if (P->infile) {
         input_fd = open(P->infile, O_RDONLY, 0644);
         dup2(input_fd, STDIN_FILENO);
@@ -133,21 +127,23 @@ void execute_tasks (Parse* P)
         else if (command_found(P->tasks[t].cmd)) {
             pid[t] = fork();
             setpgid(pid[t], pid[0]);
-            set_fg_pgid(pid[0]);
 
-            if (t == 0)
-                create_job(&job, P, pid[0]);
+            /* Parent process*/
+            if (pid[t] > 0) {
+                input_fd = pipe_fd[READ_SIDE];
+                close(pipe_fd[WRITE_SIDE]);
 
-            if (pid[t] == 0) {
+                if (t == 0)
+                    create_job(&job, P, pid[0]);
+
+                job.pid[t] = pid[t];
+                set_fg_pgid((!P->background) ? job.pgid : getpgrp());
+            }
+            /* Child process */
+            else if (pid[t] == 0) {
                 dup2(input_fd, STDIN_FILENO);
                 dup2(output_fd, STDOUT_FILENO);
                 execvp(P->tasks[t].cmd, P->tasks[t].argv);
-            }
-
-            else if (pid[t] > 0) {
-                input_fd = pipe_fd[READ_SIDE];
-                close(pipe_fd[WRITE_SIDE]);
-                job.pid[t] = pid[t];
             }
         }
 
@@ -166,26 +162,35 @@ void execute_tasks (Parse* P)
     else if (command_found(P->tasks[t].cmd)) {
         pid[t] = fork();
         setpgid(pid[t], pid[0]);
-        set_fg_pgid(pid[0]);
 
-        job.pid[t] = pid[t];
+        /* Parent process */
+        if (pid[t] > 0) {
+            if (t == 0)
+                create_job(&job, P, pid[0]);
 
-        if (pid[t] == 0) {
-            if (P->background) {
-                setsid();
-            }
-
+            job.pid[t] = pid[t];
+            set_fg_pgid((!P->background) ? job.pgid : getpgrp());
+        }
+        /* Child process */
+        else if (pid[t] == 0) {
             dup2(input_fd, STDIN_FILENO);
             dup2(output_fd, STDOUT_FILENO);
             execvp(P->tasks[t].cmd, P->tasks[t].argv);
+
         }
     }
 
     else 
         printf("pssh: does not exist\n");
 
-    if (P->background)
-        printf("%d\n", job.pid[t]);
+    if (P->background) {
+        printf("[%d] ", jobs);
+
+        for (t = 0; t < P->ntasks; t++)
+            printf("%d ", job.pid[t]);
+
+        printf("\n");
+    }
 
 #if 0
     /* DEBUGGING SHIT */
@@ -238,9 +243,6 @@ void handler(int sig)
             jobs--;
             proc_killed = 0;
         }
-
-        if (job.status == BG)
-            set_fg_pgid(getpgrp());
     }
 }
 
