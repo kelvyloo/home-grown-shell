@@ -156,6 +156,7 @@ void execute_tasks (Parse* P)
     if (P->outfile)
         output_fd = open(P->outfile, O_CREAT | O_WRONLY, 0644);
 
+    /* Run last (or only) process of the job */
     if (is_builtin(P->tasks[t].cmd))
         builtin_execute(P->tasks[t]);
 
