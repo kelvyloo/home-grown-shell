@@ -15,6 +15,12 @@
 #include "helper_funcs.h"
 
 #define MAX_JOBS 100
+#define READ_SIDE 0
+#define WRITE_SIDE 1
+
+Job job;
+int jobs = 0;
+int job_finished = 0;
 
 /*******************************************
  * Set to 1 to view the command line parse *
@@ -88,12 +94,6 @@ static int command_found (const char* cmd)
     return ret;
 }
 
-#define READ_SIDE 0
-#define WRITE_SIDE 1
-
-Job job;
-int jobs = 0;
-
 /* Called upon receiving a successful parse.
  * This function is responsible for cycling through the
  * tasks, and forking, executing, etc as necessary to get
@@ -149,7 +149,7 @@ void execute_tasks (Parse* P)
             }
         }
         else
-            printf("pssh: does not exist\n");
+            printf("pssh: %s command not found\n", P->tasks[t].cmd);
     }
 
     if (P->outfile)
@@ -180,10 +180,10 @@ void execute_tasks (Parse* P)
         }
     }
     else 
-        printf("pssh: does not exist\n");
+        printf("pssh: %s command not found\n", P->tasks[t].cmd);
 
     if (P->background)
-        print_background_job(jobs, &job);
+        print_background_job(jobs, &job, 0);
 
 #if 0
     /* DEBUGGING SHIT */
@@ -235,9 +235,11 @@ void handler(int sig)
             set_fg_pgid(getpgrp());
 
             if (job.status == BG)
-                printf("\n[%d]+ Done \t%s\n", jobs, job.name);
+                job_finished = 1;
 
-            jobs--;
+            else if (job.status == FG)
+                jobs--;
+
             proc_killed = 0;
         }
     }
@@ -255,6 +257,12 @@ int main (int argc, char** argv)
     signal(SIGTTIN, handler_sigttin);
 
     while (1) {
+        if (job_finished) {
+            print_background_job(jobs, &job, job_finished);
+            jobs--;
+            job_finished = 0;
+        }
+
         cmdline = readline (build_prompt());
         if (!cmdline)       /* EOF (ex: ctrl-d) */
             exit (EXIT_SUCCESS);
@@ -279,4 +287,3 @@ int main (int argc, char** argv)
         free(cmdline);
     }
 }
-
