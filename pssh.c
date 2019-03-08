@@ -149,7 +149,7 @@ void execute_tasks (Parse* P)
             }
         }
         else
-            printf("pssh: %s command not found\n", P->tasks[t].cmd);
+            fprintf(stderr, "pssh: %s command not found\n", P->tasks[t].cmd);
     }
 
     if (P->outfile)
@@ -180,7 +180,7 @@ void execute_tasks (Parse* P)
         }
     }
     else 
-        printf("pssh: %s command not found\n", P->tasks[t].cmd);
+        fprintf(stderr, "pssh: %s command not found\n", P->tasks[t].cmd);
 
     if (P->background)
         print_background_job(jobs, &job, 0);
@@ -196,6 +196,7 @@ void execute_tasks (Parse* P)
 
     printf("---------------------------------\n");
 #endif
+    free(pid);
 
     /* Restore stdin & out */
     dup2(og_stdin, STDIN_FILENO);
@@ -259,6 +260,7 @@ int main (int argc, char** argv)
     while (1) {
         if (job_finished) {
             print_background_job(jobs, &job, job_finished);
+            destroy_job(&job);
             jobs--;
             job_finished = 0;
         }
