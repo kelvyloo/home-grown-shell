@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/types.h> /* pid_t                   */
 #include <unistd.h>    /* execvp(), fork()        */
 #include <signal.h>
@@ -10,8 +11,9 @@
 void create_job(Job *job, Parse *P, pid_t pgid)
 {
     job->pid = malloc(P->ntasks * sizeof(pid_t));
+    job->name = malloc(sizeof(char *));
 
-    job->name = P->tasks[0].cmd;
+    strcpy(job->name, P->tasks[0].cmd);
     job->npids = P->ntasks;
     job->pgid = pgid;
     job->pid[0] = job->pgid;
@@ -33,7 +35,7 @@ void set_fg_pgid(pid_t pgid)
 void print_background_job(int job_num, Job *job, int done)
 {
     if (done) {
-        printf("\n[%d]+ Done \t%s\n", job_num, job->name);
+        printf("[%d]+ Done \t%s\n", job_num, job->name);
     }
     else {
         int t;
