@@ -20,6 +20,16 @@ void create_job(Job *job, Parse *P, pid_t pgid)
     job->status = (P->background) ? BG : FG;
 }
 
+void destroy_job(Job *job)
+{
+    free(job->pid);
+    free(job->name);
+
+    job->npids = 0;
+    job->pgid = 0;
+    job->status = 0;
+}
+
 void set_fg_pgid(pid_t pgid)
 {
     void (*old)(int);
