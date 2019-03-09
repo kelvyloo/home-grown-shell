@@ -20,7 +20,7 @@
 
 Job job;
 int jobs = 0;
-int job_finished = 0;
+int bg_job_finished = 0;
 
 /*******************************************
  * Set to 1 to view the command line parse *
@@ -183,7 +183,7 @@ void execute_tasks (Parse* P)
         fprintf(stderr, "pssh: %s command not found\n", P->tasks[t].cmd);
 
     if (P->background)
-        print_background_job(jobs, &job, 0);
+        print_job_info(jobs, &job, 0);
 
 #if 0
     /* DEBUGGING SHIT */
@@ -220,28 +220,34 @@ void handler_sigttin (int sig)
 
 void handler(int sig)
 {
+    pid_t child_pid;
     int status;
-    static int proc_killed;
+    static int proc_killed = 0;
 
-    waitpid(-1, &status, WNOHANG | WUNTRACED | WCONTINUED);
+    child_pid = waitpid(-1, &status, WNOHANG | WUNTRACED | WCONTINUED);
 
     if (WIFSTOPPED(status)) {
     }
     else if (WIFCONTINUED(status)) {
     }
     else {
-        proc_killed++;
+        /* TODO Compare PID to jobs' PIDs and determine if job done */
+        int i;
+
+        for (i = 0; i < job.npids; i++)
+            if (child_pid == job.pid[i])
+                proc_killed++;
 
         if (proc_killed == job.npids) {
             set_fg_pgid(getpgrp());
+            proc_killed = 0;
 
             if (job.status == BG)
-                job_finished = 1;
-
-            else if (job.status == FG)
+                bg_job_finished = 1;
+            else {
+                destroy_job(&job);
                 jobs--;
-
-            proc_killed = 0;
+            }
         }
     }
 }
@@ -257,12 +263,14 @@ int main (int argc, char** argv)
     signal(SIGTTOU, handler_sigttou);
     signal(SIGTTIN, handler_sigttin);
 
+    init_job(&job);
+
     while (1) {
-        if (job_finished) {
-            print_background_job(jobs, &job, job_finished);
+        if (bg_job_finished) {
+            print_job_info(jobs, &job, bg_job_finished);
             destroy_job(&job);
+            bg_job_finished = 0;
             jobs--;
-            job_finished = 0;
         }
 
         cmdline = readline (build_prompt());
