@@ -19,7 +19,7 @@
 #define WRITE_SIDE 1
 
 Job jobs[MAX_JOBS];
-int job_num = 0;
+int finished_job_num = 0;
 int bg_job_finished = 0;
 
 /*******************************************
@@ -104,12 +104,15 @@ void execute_tasks (Parse* P)
     int input_fd, output_fd;
     int pipe_fd[2];
     pid_t *pid = malloc(P->ntasks * sizeof(pid_t));
+    int new_job_num;
 
     int og_stdin = dup(STDIN_FILENO);
     int og_stdout = dup(STDOUT_FILENO);
 
     input_fd = og_stdin;
     output_fd = og_stdout;
+
+    new_job_num = assign_lowest_job_num(jobs, MAX_JOBS);
 
     if (P->infile) {
         input_fd = open(P->infile, O_RDONLY, 0644);
@@ -139,10 +142,10 @@ void execute_tasks (Parse* P)
                 close(pipe_fd[WRITE_SIDE]);
 
                 if (t == 0)
-                    create_job(&jobs[job_num], P, pid[0]);
+                    create_job(&jobs[new_job_num], P, pid[0]);
 
-                jobs[job_num].pid[t] = pid[t];
-                set_fg_pgid((!P->background) ? jobs[job_num].pgid : getpgrp());
+                jobs[new_job_num].pid[t] = pid[t];
+                set_fg_pgid((!P->background) ? jobs[new_job_num].pgid : getpgrp());
             }
             /* Child process */
             else if (pid[t] == 0) {
@@ -159,21 +162,19 @@ void execute_tasks (Parse* P)
     }
 
     if (P->background)
-        print_job_info(job_num, &jobs[job_num], 0);
+        print_job_info(new_job_num, &jobs[new_job_num], 0);
 
 #if 0
     /* DEBUGGING SHIT */
     printf("---------------------------------\n");
     printf("jobs NAME: %s | PGID: %d | Num proc: %d | Status %d\n", 
-            jobs[job_num].name, jobs[job_num].pgid, jobs[job_num].npids, jobs[job_num].status);
+            jobs[new_job_num].name, jobs[new_job_num].pgid, jobs[new_job_num].npids, jobs[new_job_num].status);
 
     for (t = 0; t < P->ntasks; t++)
-        printf("pid %d\n", jobs[job_num].pid[t]);
+        printf("pid %d\n", jobs[new_job_num].pid[t]);
 
     printf("---------------------------------\n");
 #endif
-
-    job_num++;
 
     free(pid);
 
@@ -217,11 +218,11 @@ void handler(int sig)
             set_fg_pgid(getpgrp());
             killed[finished_job-1] = 0;
 
-            if (jobs[finished_job-1].status == BG)
-                bg_job_finished = 1;
-            else {
+            if (jobs[finished_job-1].status == FG)
                 destroy_job(&jobs[finished_job-1]);
-                job_num--;
+            else {
+                bg_job_finished = 1;
+                finished_job_num = finished_job - 1;
             }
         }
     }
@@ -244,10 +245,10 @@ int main (int argc, char** argv)
 
     while (1) {
         if (bg_job_finished) {
-            print_job_info(job_num-1, &jobs[job_num-1], bg_job_finished);
-            destroy_job(&jobs[job_num-1]);
+            print_job_info(finished_job_num, &jobs[finished_job_num], bg_job_finished);
+            destroy_job(&jobs[finished_job_num]);
             bg_job_finished = 0;
-            job_num--;
+            finished_job_num = 0;
         }
 
         cmdline = readline (build_prompt());

@@ -20,6 +20,8 @@ typedef struct {
 
 void init_jobs(Job *jobs, int num_jobs);
 
+int assign_lowest_job_num(Job *jobs, int num_jobs);
+
 void create_job(Job *job, Parse *P, pid_t pgid);
 
 void destroy_job(Job *job);

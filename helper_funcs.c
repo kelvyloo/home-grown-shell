@@ -25,6 +25,47 @@ void init_jobs(Job *jobs, int num_jobs)
         init_job(&jobs[i]);
 }
 
+int assign_lowest_job_num(Job *jobs, int num_jobs)
+{
+    int i;
+    int lowest_available_job_num = 0;
+
+    for (i = 0; i < num_jobs; i++)
+        if (jobs[i].name == NULL) {
+            lowest_available_job_num = i;
+            break;
+        }
+
+    return lowest_available_job_num;
+}
+
+#if 0
+static char * build_job_name(Parse *P)
+{
+    int i, j;
+    char *job_name = malloc(sizeof(char *));
+    job_name[0] = '\0';
+
+    for (i = 0; i < P->ntasks; i++) {
+
+        for (j = 0; P->tasks[i].argv[j]; j++) {
+            if (i == 0 && j == 0)
+                strcpy(job_name, P->tasks[i].argv[j]);
+            else
+                strcat(job_name, P->tasks[i].argv[j]);
+
+            strcat(job_name, " ");
+        }
+        
+        if (i != P->ntasks-1)
+            strcat(job_name, "| ");
+    }
+
+    //fprintf(stderr, "%s\n", job_name);
+    return job_name;
+}
+#endif
+
 void create_job(Job *job, Parse *P, pid_t pgid)
 {
     job->pid = malloc(P->ntasks * sizeof(pid_t));
@@ -68,6 +109,7 @@ int is_job_done(pid_t child_pid, Job *jobs, int num_jobs, int *killed)
     int finished_job = 0;
 
     for (i = 0; i < num_jobs; i++) {
+
         for (j = 0; j < jobs[i].npids; j++) {
             if (child_pid == jobs[i].pid[j]) {
                 killed[i]++;
