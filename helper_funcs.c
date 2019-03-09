@@ -39,12 +39,9 @@ int assign_lowest_job_num(Job *jobs, int num_jobs)
     return lowest_available_job_num;
 }
 
-#if 0
-static char * build_job_name(Parse *P)
+static void build_job_name(Parse *P, char *job_name)
 {
     int i, j;
-    char *job_name = malloc(sizeof(char *));
-    job_name[0] = '\0';
 
     for (i = 0; i < P->ntasks; i++) {
 
@@ -60,18 +57,16 @@ static char * build_job_name(Parse *P)
         if (i != P->ntasks-1)
             strcat(job_name, "| ");
     }
-
-    //fprintf(stderr, "%s\n", job_name);
-    return job_name;
 }
-#endif
 
 void create_job(Job *job, Parse *P, pid_t pgid)
 {
     job->pid = malloc(P->ntasks * sizeof(pid_t));
-    job->name = malloc(sizeof(char *));
+    job->name = malloc(256);
 
-    strcpy(job->name, P->tasks[0].cmd);
+    build_job_name(P, job->name);
+
+    //strcpy(job->name, P->tasks[0].cmd);
     job->npids = P->ntasks;
     job->pgid = pgid;
     job->pid[0] = job->pgid;
