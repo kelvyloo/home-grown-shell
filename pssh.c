@@ -19,7 +19,7 @@
 #define WRITE_SIDE 1
 
 Job job;
-int jobs = 0;
+int job_num = 0;
 int bg_job_finished = 0;
 
 /*******************************************
@@ -108,7 +108,7 @@ void execute_tasks (Parse* P)
     int og_stdin = dup(STDIN_FILENO);
     int og_stdout = dup(STDOUT_FILENO);
 
-    jobs++;
+    job_num++;
 
     input_fd = og_stdin;
     output_fd = og_stdout;
@@ -160,6 +160,9 @@ void execute_tasks (Parse* P)
             fprintf(stderr, "pssh: %s command not found\n", P->tasks[t].cmd);
     }
 
+    if (P->background)
+        print_job_info(job_num, &job, bg_job_finished);
+
 #if 0
     /* DEBUGGING SHIT */
     printf("---------------------------------\n");
@@ -207,7 +210,6 @@ void handler(int sig)
     else if (WIFCONTINUED(status)) {
     }
     else {
-        /* TODO Compare PID to jobs' PIDs and determine if job done */
         int i;
 
         for (i = 0; i < job.npids; i++)
@@ -222,7 +224,7 @@ void handler(int sig)
                 bg_job_finished = 1;
             else {
                 destroy_job(&job);
-                jobs--;
+                job_num--;
             }
         }
     }
@@ -243,10 +245,10 @@ int main (int argc, char** argv)
 
     while (1) {
         if (bg_job_finished) {
-            print_job_info(jobs, &job, bg_job_finished);
+            print_job_info(job_num, &job, bg_job_finished);
             destroy_job(&job);
             bg_job_finished = 0;
-            jobs--;
+            job_num--;
         }
 
         cmdline = readline (build_prompt());
