@@ -65,10 +65,10 @@ int is_job_done(pid_t child_pid, Job *jobs, int num_jobs, int *killed)
 {
     int i, j;
     int skip = 0;
-    int finished_job;
+    int finished_job = 0;
 
     for (i = 0; i < num_jobs; i++) {
-        for (j = 0; j < jobs[i].npids; i++) {
+        for (j = 0; j < jobs[i].npids; j++) {
             if (child_pid == jobs[i].pid[j]) {
                 killed[i]++;
                 finished_job = (killed[i] == jobs[i].npids) ? i+1 : 0;
