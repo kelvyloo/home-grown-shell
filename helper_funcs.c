@@ -99,6 +99,28 @@ void set_fg_pgid(pid_t pgid)
     signal (SIGTTOU, old);
 }
 
+int is_job_stopped(pid_t child_pid, Job *jobs, int num_jobs)
+{
+    int i, j;
+    int skip = 0;
+    int stopped_job;
+
+    for (i = 0; i < num_jobs; i++) {
+
+        for (j = 0; j < jobs[i].npids; j++) {
+            if (child_pid == jobs[i].pid[j]) {
+                stopped_job = i;
+                skip = 1;
+                break;
+            }
+        }
+        if (skip)
+            break;
+    }
+    
+    return stopped_job;
+}
+
 int is_job_done(pid_t child_pid, Job *jobs, int num_jobs, int *killed)
 {
     int i, j;
@@ -124,19 +146,26 @@ int is_job_done(pid_t child_pid, Job *jobs, int num_jobs, int *killed)
 
 void print_job_info(int job_num, Job *job, int done)
 {
-    if (job->status == BG) {
-        if (done)
-            printf("[%d]+ Done \t%s\n", job_num+1, job->name);
+    switch (job->status) {
+        case STOPPED:
+            printf("\n[%d]+ Stopped \t%s\n", job_num+1, job->name);
+            break;
+        case BG:
+            if (done)
+                printf("[%d]+ Done \t%s\n", job_num+1, job->name);
 
-        else {
-            int t;
+            else {
+                int t;
 
-            printf("[%d] ", job_num+1);
+                printf("[%d] ", job_num+1);
 
-            for (t = 0; t < job->npids; t++)
-                printf("%d ", job->pid[t]);
+                for (t = 0; t < job->npids; t++)
+                    printf("%d ", job->pid[t]);
 
-            printf("\n");
-        }
+                printf("\n");
+            }
+            break;
+        default:
+            break;
     }
 }

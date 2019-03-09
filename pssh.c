@@ -208,6 +208,15 @@ void handler(int sig)
     child_pid = waitpid(-1, &status, WNOHANG | WUNTRACED | WCONTINUED);
 
     if (WIFSTOPPED(status)) {
+        int stopped_job = 0;
+
+        set_fg_pgid(getpgrp());
+        stopped_job = is_job_stopped(child_pid, jobs, MAX_JOBS);
+
+        if (jobs[stopped_job].status == FG) {
+            jobs[stopped_job].status = STOPPED;
+            print_job_info(stopped_job, &jobs[stopped_job], 0);
+        }
     }
     else if (WIFCONTINUED(status)) {
     }
