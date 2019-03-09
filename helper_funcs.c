@@ -47,15 +47,17 @@ static void build_job_name(Parse *P, char *job_name)
 
         for (j = 0; P->tasks[i].argv[j]; j++) {
             if (i == 0 && j == 0)
-                strcpy(job_name, P->tasks[i].argv[j]);
+                strncpy(job_name, P->tasks[i].argv[j], 
+                        sizeof(job_name)/sizeof(char));
             else
-                strcat(job_name, P->tasks[i].argv[j]);
+                strncat(job_name, P->tasks[i].argv[j], 
+                        sizeof(job_name)/sizeof(char));
 
-            strcat(job_name, " ");
+            strncat(job_name, " ", sizeof(job_name)/sizeof(char));
         }
         
         if (i != P->ntasks-1)
-            strcat(job_name, "| ");
+            strncat(job_name, "| ", sizeof(job_name)/sizeof(char));
     }
 }
 
