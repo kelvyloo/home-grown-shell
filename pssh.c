@@ -18,8 +18,8 @@
 #define READ_SIDE 0
 #define WRITE_SIDE 1
 
-Job job;
-int jobs = 0;
+Job jobs[MAX_JOBS];
+int finished_job_num = 0;
 int bg_job_finished = 0;
 
 /*******************************************
@@ -97,30 +97,36 @@ static int command_found (const char* cmd)
 /* Called upon receiving a successful parse.
  * This function is responsible for cycling through the
  * tasks, and forking, executing, etc as necessary to get
- * the job done! */
+ * the jobs done! */
 void execute_tasks (Parse* P)
 {
     int t = 0;
     int input_fd, output_fd;
     int pipe_fd[2];
     pid_t *pid = malloc(P->ntasks * sizeof(pid_t));
+    int new_job_num;
 
     int og_stdin = dup(STDIN_FILENO);
     int og_stdout = dup(STDOUT_FILENO);
 
-    jobs++;
-
     input_fd = og_stdin;
     output_fd = og_stdout;
+
+    new_job_num = assign_lowest_job_num(jobs, MAX_JOBS);
 
     if (P->infile) {
         input_fd = open(P->infile, O_RDONLY, 0644);
         dup2(input_fd, STDIN_FILENO);
     }
 
-    for (t = 0; t < (P->ntasks-1); t++) {
+    for (t = 0; t < P->ntasks; t++) {
         pipe(pipe_fd);
-        output_fd = pipe_fd[WRITE_SIDE];
+
+        if (t < (P->ntasks-1))
+            output_fd = pipe_fd[WRITE_SIDE];
+        else
+            if (P->outfile)
+                output_fd = open(P->outfile, O_CREAT | O_WRONLY, 0644);
 
         if (is_builtin(P->tasks[t].cmd)) {
             dup2(output_fd, STDOUT_FILENO);
@@ -136,15 +142,18 @@ void execute_tasks (Parse* P)
                 close(pipe_fd[WRITE_SIDE]);
 
                 if (t == 0)
-                    create_job(&job, P, pid[0]);
+                    create_job(&jobs[new_job_num], P, pid[0]);
 
-                job.pid[t] = pid[t];
-                set_fg_pgid((!P->background) ? job.pgid : getpgrp());
+                jobs[new_job_num].pid[t] = pid[t];
+                set_fg_pgid((!P->background) ? jobs[new_job_num].pgid : getpgrp());
             }
             /* Child process */
             else if (pid[t] == 0) {
                 dup2(input_fd, STDIN_FILENO);
-                dup2(output_fd, STDOUT_FILENO);
+
+                if (t != P->ntasks-1 || P->outfile)
+                    dup2(output_fd, STDOUT_FILENO);
+
                 execvp(P->tasks[t].cmd, P->tasks[t].argv);
             }
         }
@@ -152,50 +161,21 @@ void execute_tasks (Parse* P)
             fprintf(stderr, "pssh: %s command not found\n", P->tasks[t].cmd);
     }
 
-    if (P->outfile)
-        output_fd = open(P->outfile, O_CREAT | O_WRONLY, 0644);
-
-    /* Run last (or only) process of the job */
-    if (is_builtin(P->tasks[t].cmd)) {
-        dup2(output_fd, STDOUT_FILENO);
-        builtin_execute(P->tasks[t]);
-    }
-    else if (command_found(P->tasks[t].cmd)) {
-        pid[t] = fork();
-        setpgid(pid[t], pid[0]);
-
-        /* Parent process */
-        if (pid[t] > 0) {
-            if (t == 0)
-                create_job(&job, P, pid[0]);
-
-            job.pid[t] = pid[t];
-            set_fg_pgid((!P->background) ? job.pgid : getpgrp());
-        }
-        /* Child process */
-        else if (pid[t] == 0) {
-            dup2(input_fd, STDIN_FILENO);
-            dup2(output_fd, STDOUT_FILENO);
-            execvp(P->tasks[t].cmd, P->tasks[t].argv);
-        }
-    }
-    else 
-        fprintf(stderr, "pssh: %s command not found\n", P->tasks[t].cmd);
-
     if (P->background)
-        print_job_info(jobs, &job, 0);
+        print_job_info(new_job_num, &jobs[new_job_num], 0);
 
 #if 0
     /* DEBUGGING SHIT */
     printf("---------------------------------\n");
-    printf("JOB NAME: %s | PGID: %d | Num proc: %d | Status %d\n", 
-            job.name, job.pgid, job.npids, job.status);
+    printf("jobs NAME: %s | PGID: %d | Num proc: %d | Status %d\n", 
+            jobs[new_job_num].name, jobs[new_job_num].pgid, jobs[new_job_num].npids, jobs[new_job_num].status);
 
     for (t = 0; t < P->ntasks; t++)
-        printf("pid %d\n", job.pid[t]);
+        printf("pid %d\n", jobs[new_job_num].pid[t]);
 
     printf("---------------------------------\n");
 #endif
+
     free(pid);
 
     /* Restore stdin & out */
@@ -222,34 +202,41 @@ void handler(int sig)
 {
     pid_t child_pid;
     int status;
-    static int proc_killed = 0;
+    int finished_job;
+    static int killed[MAX_JOBS] = {0};
 
     child_pid = waitpid(-1, &status, WNOHANG | WUNTRACED | WCONTINUED);
 
     if (WIFSTOPPED(status)) {
+        int stopped_job = 0;
+
+        set_fg_pgid(getpgrp());
+        stopped_job = is_job_stopped(child_pid, jobs, MAX_JOBS);
+
+        if (jobs[stopped_job].status == FG) {
+            jobs[stopped_job].status = STOPPED;
+            print_job_info(stopped_job, &jobs[stopped_job], 0);
+        }
     }
     else if (WIFCONTINUED(status)) {
     }
     else {
-        /* TODO Compare PID to jobs' PIDs and determine if job done */
-        int i;
+        finished_job = is_job_done(child_pid, jobs, MAX_JOBS, killed);
 
-        for (i = 0; i < job.npids; i++)
-            if (child_pid == job.pid[i])
-                proc_killed++;
-
-        if (proc_killed == job.npids) {
+        if (finished_job) {
             set_fg_pgid(getpgrp());
-            proc_killed = 0;
+            killed[finished_job-1] = 0;
 
-            if (job.status == BG)
-                bg_job_finished = 1;
+            if (jobs[finished_job-1].status == FG)
+                destroy_job(&jobs[finished_job-1]);
             else {
-                destroy_job(&job);
-                jobs--;
+                bg_job_finished = 1;
+                finished_job_num = finished_job - 1;
             }
         }
     }
+
+    return ;
 }
 
 int main (int argc, char** argv)
@@ -263,14 +250,14 @@ int main (int argc, char** argv)
     signal(SIGTTOU, handler_sigttou);
     signal(SIGTTIN, handler_sigttin);
 
-    init_job(&job);
+    init_jobs(jobs, MAX_JOBS);
 
     while (1) {
         if (bg_job_finished) {
-            print_job_info(jobs, &job, bg_job_finished);
-            destroy_job(&job);
+            print_job_info(finished_job_num, &jobs[finished_job_num], bg_job_finished);
+            destroy_job(&jobs[finished_job_num]);
             bg_job_finished = 0;
-            jobs--;
+            finished_job_num = 0;
         }
 
         cmdline = readline (build_prompt());
