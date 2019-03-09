@@ -118,9 +118,14 @@ void execute_tasks (Parse* P)
         dup2(input_fd, STDIN_FILENO);
     }
 
-    for (t = 0; t < (P->ntasks-1); t++) {
+    for (t = 0; t < P->ntasks; t++) {
         pipe(pipe_fd);
-        output_fd = pipe_fd[WRITE_SIDE];
+
+        if (t < (P->ntasks-1))
+            output_fd = pipe_fd[WRITE_SIDE];
+        else
+            if (P->outfile)
+                output_fd = open(P->outfile, O_CREAT | O_WRONLY, 0644);
 
         if (is_builtin(P->tasks[t].cmd)) {
             dup2(output_fd, STDOUT_FILENO);
@@ -144,46 +149,16 @@ void execute_tasks (Parse* P)
             /* Child process */
             else if (pid[t] == 0) {
                 dup2(input_fd, STDIN_FILENO);
-                dup2(output_fd, STDOUT_FILENO);
+
+                if (t != P->ntasks-1 || P->outfile)
+                    dup2(output_fd, STDOUT_FILENO);
+
                 execvp(P->tasks[t].cmd, P->tasks[t].argv);
             }
         }
         else
             fprintf(stderr, "pssh: %s command not found\n", P->tasks[t].cmd);
     }
-
-    if (P->outfile)
-        output_fd = open(P->outfile, O_CREAT | O_WRONLY, 0644);
-
-    /* Run last (or only) process of the job */
-    if (is_builtin(P->tasks[t].cmd)) {
-        dup2(output_fd, STDOUT_FILENO);
-        builtin_execute(P->tasks[t]);
-    }
-    else if (command_found(P->tasks[t].cmd)) {
-        pid[t] = fork();
-        setpgid(pid[t], pid[0]);
-
-        /* Parent process */
-        if (pid[t] > 0) {
-            if (t == 0)
-                create_job(&job, P, pid[0]);
-
-            job.pid[t] = pid[t];
-            set_fg_pgid((!P->background) ? job.pgid : getpgrp());
-        }
-        /* Child process */
-        else if (pid[t] == 0) {
-            dup2(input_fd, STDIN_FILENO);
-            dup2(output_fd, STDOUT_FILENO);
-            execvp(P->tasks[t].cmd, P->tasks[t].argv);
-        }
-    }
-    else 
-        fprintf(stderr, "pssh: %s command not found\n", P->tasks[t].cmd);
-
-    if (P->background)
-        print_job_info(jobs, &job, 0);
 
 #if 0
     /* DEBUGGING SHIT */
@@ -196,6 +171,7 @@ void execute_tasks (Parse* P)
 
     printf("---------------------------------\n");
 #endif
+
     free(pid);
 
     /* Restore stdin & out */
