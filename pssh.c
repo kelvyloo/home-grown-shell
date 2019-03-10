@@ -242,23 +242,22 @@ void handler(int sig)
 {
     pid_t child_pid;
     int status;
-    int finished_job;
+    int job_index;
     static int killed[MAX_JOBS] = {0};
 
     child_pid = waitpid(-1, &status, WNOHANG | WUNTRACED | WCONTINUED);
+
+    job_index = find_job_index(child_pid, jobs, MAX_JOBS);
 
     if (WIFSTOPPED(status)) {
         /* If a job is stopped:
          *  - set shell to foreground
          *  - tell user job is stopped */
-        int stopped_job = 0;
-
         set_fg_pgid(getpgrp());
-        stopped_job = is_job_stopped(child_pid, jobs, MAX_JOBS);
 
-        if (jobs[stopped_job].status == FG) {
-            jobs[stopped_job].status = STOPPED;
-            print_job_info(stopped_job, &jobs[stopped_job], 0);
+        if (jobs[job_index].status == FG) {
+            jobs[job_index].status = STOPPED;
+            print_job_info(job_index, &jobs[job_index], 0);
         }
     }
     else if (WIFCONTINUED(status)) {
@@ -271,17 +270,17 @@ void handler(int sig)
          *  - remove job
          * If BG job:
          *  - send signal to main print and destroy job */
-        finished_job = is_job_done(child_pid, jobs, MAX_JOBS, killed);
+        killed[job_index]++;
 
-        if (finished_job) {
+        if (killed[job_index] == jobs[job_index].npids) {
             set_fg_pgid(getpgrp());
-            killed[finished_job-1] = 0;
+            killed[job_index] = 0;
 
-            if (jobs[finished_job-1].status == FG)
-                destroy_job(&jobs[finished_job-1]);
+            if (jobs[job_index].status == FG)
+                destroy_job(&jobs[job_index]);
             else {
                 bg_job_finished = 1;
-                finished_job_num = finished_job - 1;
+                finished_job_num = job_index;
             }
         }
     }
