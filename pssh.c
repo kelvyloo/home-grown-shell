@@ -14,11 +14,6 @@
 
 #include "helper_funcs.h"
 
-#define MAX_JOBS 100
-#define READ_SIDE 0
-#define WRITE_SIDE 1
-
-Job jobs[MAX_JOBS];
 int finished_job_num = 0;
 int bg_job_finished = 0;
 

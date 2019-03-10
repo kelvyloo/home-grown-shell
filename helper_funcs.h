@@ -3,6 +3,10 @@
 
 #include "parse.h"
 
+#define MAX_JOBS 100
+#define READ_SIDE 0
+#define WRITE_SIDE 1
+
 typedef enum {
     STOPPED,
     TERM,
@@ -17,6 +21,8 @@ typedef struct {
     pid_t pgid;
     JobStatus status;
 } Job;
+
+Job jobs[MAX_JOBS];
 
 void init_jobs(Job *jobs, int num_jobs);
 
