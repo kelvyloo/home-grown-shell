@@ -13,7 +13,7 @@ static char* builtin[] = {
     "kill",   /* TODO send signal to process */
     "jobs",   /* list shell jobs */
     "fg",     /* foreground a process */
-    "bg",     /* TODO background a process */
+    "bg",     /* background a process */
     NULL
 };
 

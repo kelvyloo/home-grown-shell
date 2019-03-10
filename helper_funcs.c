@@ -218,7 +218,7 @@ void sigcont_cmd(char **argv, int fg)
 
     fprintf(stdout, "%s\n", jobs[target_job].name);
 
-    jobs[target_job].status = (fg) ? FG : BG;
+    jobs[target_job].status = FG;
 
     kill(-jobs[target_job].pgid, SIGCONT);
 
