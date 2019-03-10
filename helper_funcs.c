@@ -8,6 +8,7 @@
 #include <fcntl.h>     /* open()      */
 #include "helper_funcs.h"
 #include <ctype.h>
+#include <errno.h>
 
 static void init_job(Job *job)
 {
@@ -176,6 +177,17 @@ void jobs_cmd()
                     i, status_to_string(jobs[i].status), jobs[i].name);
 }
 
+static int invalid_input(char *arg_string)
+{
+    int i;
+
+    for (i = 0; arg_string[i]; i++)
+        if (!isdigit(arg_string[i]))
+            return 1;
+
+    return 0;
+}
+
 static const char *fg_usage = "Usage: fg %<job number>\n";
 static const char *bg_usage = "Usage: bg %<job number>\n";
 
@@ -201,12 +213,10 @@ void sigcont_cmd(char **argv, int fg)
 
     arg_string = &argv[1][1];
 
-    int i;
-    for (i = 0; arg_string[i]; i++)
-        if (!isdigit(arg_string[i])) {
-            fprintf(stdout, "pssh: invalid job number: [%s]\n", arg_string);
-            return ;
-        }
+    if (invalid_input(arg_string)) {
+        fprintf(stdout, "pssh: invalid job number: [%s]\n", arg_string);
+        return ;
+    }
 
     target_job = atoi(arg_string);
 
@@ -223,4 +233,87 @@ void sigcont_cmd(char **argv, int fg)
 
     if (fg)
         set_fg_pgid(jobs[target_job].pgid);
+}
+
+static int send_signal(pid_t pid, int signal) 
+{
+    int ret;
+
+    ret = kill(-pid, signal);
+
+    if (ret == -1 || signal == 0) {
+        switch (errno) {
+            case EINVAL:
+                printf("Invalid signal specified\n");
+                break;
+            case EPERM:
+                printf("Do not have permission to send PID %d signals\n", pid);
+                break;
+            case ESRCH:
+                printf("PID %d does not exist\n", pid);
+                break;
+            default:
+                printf("PID %d exists and can receive signals\n", pid);
+                break;
+        }
+    }
+
+    return 0;
+}
+
+static const char *kill_usage = "Usage: kill [-s <signal>] <pid> | %<job> ...\n";
+
+void kill_cmd(char **argv)
+{
+    size_t argc = 0;
+    int i, signal, job;
+    pid_t pid;
+    char *arg_string = NULL;
+
+    for (i = 0; argv[i]; i++)
+        argc++;
+
+    if (argc < 2) {
+        fprintf(stdout, "%s", kill_usage);
+        return ;
+    }
+
+    if (!strcmp (argv[1], "-s")) {
+        if (invalid_input(argv[2])) {
+            fprintf(stdout, "pssh: invalid signal [%s]\n", argv[2]);
+            return ;
+        }
+        signal = atoi(argv[2]);
+        i = 3;
+    }
+    else {
+        signal = SIGTERM;
+        i = 1;
+    }
+
+    for (; argv[i]; i++) {
+        if (argv[i][0] == '%') {
+            job = 1;
+            arg_string = &argv[i][1];
+        }
+        else {
+            job = 0;
+            arg_string = argv[i];
+        }
+            
+        if (invalid_input(arg_string)) {
+            fprintf(stdout, "pssh: invalid job number: [%s]\n", argv[i]);
+            return ;
+        }
+
+        pid = atoi(arg_string);
+        
+        pid = (job) ? jobs[pid].pgid : pid;
+
+        fprintf(stdout, "Sending signal \"%s\" to %d\n", strsignal(signal), pid);
+
+        send_signal(pid, signal);
+    }
+
+    return ;
 }

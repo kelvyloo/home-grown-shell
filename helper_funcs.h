@@ -101,4 +101,12 @@ void jobs_cmd();
  * */
 void sigcont_cmd(char **argv, int fg);
 
+/* Built-in kill command
+ *
+ * @param argv  array of strings provided by user
+ *
+ * @return none
+ * */
+void kill_cmd(char **argv);
+
 #endif

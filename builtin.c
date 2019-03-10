@@ -10,7 +10,7 @@
 static char* builtin[] = {
     "exit",   /* exits the shell */
     "which",  /* displays full path to command */
-    "kill",   /* TODO send signal to process */
+    "kill",   /* send signal to process */
     "jobs",   /* list shell jobs */
     "fg",     /* foreground a process */
     "bg",     /* background a process */
@@ -72,6 +72,9 @@ void builtin_execute (Task T)
     else if (!strcmp (T.cmd, "which")) {
         if (*(T.argv + 1) != NULL)
             find_filepath(T);
+    }
+    else if (!strcmp (T.cmd, "kill")) {
+        kill_cmd(T.argv);
     }
     else if (!strcmp (T.cmd, "jobs")) {
         jobs_cmd();
