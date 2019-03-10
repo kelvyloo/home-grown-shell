@@ -245,12 +245,14 @@ void handler(int sig)
     job_index = find_job_index(child_pid, jobs, MAX_JOBS);
 
     if (WIFSTOPPED(status)) {
-        /* If a job is stopped:
+        if (jobs[job_index].status == BG)
+            jobs[job_index].status = STOPPED;
+
+        /* If a job is in foreground and stopped:
          *  - set shell to foreground
          *  - tell user job is stopped */
-        set_fg_pgid(getpgrp());
-
         if (jobs[job_index].status == FG) {
+            set_fg_pgid(getpgrp());
             jobs[job_index].status = STOPPED;
             print_job_info(job_index, &jobs[job_index], 0);
         }

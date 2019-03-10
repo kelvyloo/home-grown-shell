@@ -125,16 +125,16 @@ void print_job_info(int job_num, Job *job, int done)
 {
     switch (job->status) {
         case STOPPED:
-            fprintf(stderr, "\n[%d]+ Stopped \t%s\n", job_num+1, job->name);
+            fprintf(stderr, "\n[%d]+ Stopped \t%s\n", job_num, job->name);
             break;
         case BG:
             if (done)
-                fprintf(stderr, "[%d]+ Done \t%s\n", job_num+1, job->name);
+                fprintf(stderr, "[%d]+ Done \t%s\n", job_num, job->name);
 
             else {
                 int t;
 
-                fprintf(stderr, "[%d] ", job_num+1);
+                fprintf(stderr, "[%d] ", job_num);
 
                 for (t = 0; t < job->npids; t++)
                     fprintf(stderr, "%d ", job->pid[t]);
@@ -145,4 +145,31 @@ void print_job_info(int job_num, Job *job, int done)
         default:
             break;
     }
+}
+
+static char *status_to_string(JobStatus status)
+{
+    char *string = NULL;
+
+    switch (status) {
+        case STOPPED: string = "stopped"; break;
+        case TERM:    string = "done";    break;
+        case BG:      string = "running"; break;
+        case FG:      string = "running"; break;
+        default:
+            break;
+    }
+    
+    return string;
+}
+
+void jobs_cmd()
+{
+    int i;
+
+    for (i = 0; i < MAX_JOBS; i++)
+        if (jobs[i].name != NULL)
+            fprintf(stdout, "[%d]+ %-10s\t%s\n", 
+                    i, status_to_string(jobs[i].status),
+                    jobs[i].name);
 }

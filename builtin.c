@@ -5,11 +5,15 @@
 
 #include "builtin.h"
 #include "parse.h"
+#include "helper_funcs.h"
 
 static char* builtin[] = {
     "exit",   /* exits the shell */
     "which",  /* displays full path to command */
-    "kill",   /* send signal to process */
+    "kill",   /* TODO send signal to process */
+    "jobs",   /* list shell jobs */
+    "fg",     /* TODO foreground a process */
+    "bg",     /* TODO background a process */
     NULL
 };
 
@@ -34,6 +38,11 @@ void find_filepath(Task T)
     char probe[PATH_MAX];
 
     PATH = strdup(getenv("PATH"));
+
+    if (is_builtin(*(T.argv + 1))) {
+        fprintf(stdout, "%s: shell built-in command\n", *(T.argv + 1));
+        return ;
+    }
 
     /* Look in the PATH env directories for cmd specified */
     for (tmp = PATH; ; tmp = NULL) {
@@ -61,16 +70,13 @@ void builtin_execute (Task T)
         exit (EXIT_SUCCESS);
     }
     else if (!strcmp (T.cmd, "which")) {
-        if (*(T.argv + 1) != NULL) {
-            if (is_builtin(*(T.argv + 1))) {
-                fprintf(stdout, "%s: shell built-in command\n", *(T.argv + 1));
-            }
-            else {
-                find_filepath(T);
-            }
-        }
+        if (*(T.argv + 1) != NULL)
+            find_filepath(T);
+    }
+    else if (!strcmp (T.cmd, "jobs")) {
+        jobs_cmd();
     }
     else {
-        printf ("pssh: builtin command: %s (not implemented!)\n", T.cmd);
+        printf ("pssh: builtin command: %s (not implemented yet)\n", T.cmd);
     }
 }

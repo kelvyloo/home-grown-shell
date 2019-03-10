@@ -38,4 +38,6 @@ int find_job_index(pid_t child_pid, Job *jobs, int num_jobs);
 
 void print_job_info(int job_num, Job *job, int done);
 
+void jobs_cmd();
+
 #endif
