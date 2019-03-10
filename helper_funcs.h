@@ -40,6 +40,6 @@ void print_job_info(int job_num, Job *job, int done);
 
 void jobs_cmd();
 
-void fg_cmd(char **argv);
+void sigcont_cmd(char **argv, int fg);
 
 #endif

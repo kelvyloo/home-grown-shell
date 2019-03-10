@@ -178,8 +178,9 @@ void jobs_cmd()
 }
 
 static const char *fg_usage = "Usage: fg %<job number>\n";
+static const char *bg_usage = "Usage: bg %<job number>\n";
 
-void fg_cmd(char **argv)
+void sigcont_cmd(char **argv, int fg)
 {
     char *arg_string = NULL;
     int target_job = 0;
@@ -188,14 +189,14 @@ void fg_cmd(char **argv)
     arg_string = *(argv + 1);
 
     if (arg_string == NULL) {
-        fprintf(stdout, "%s", fg_usage);
+        fprintf(stdout, "%s", (fg) ? fg_usage : bg_usage);
         return ;
     }
 
     string_size = strlen(arg_string);
 
     if (arg_string[0] != '%' || string_size < 2) {
-        fprintf(stdout, "%s", fg_usage);
+        fprintf(stdout, "%s", (fg) ? fg_usage : bg_usage);
         return ;
     }
 
@@ -204,21 +205,23 @@ void fg_cmd(char **argv)
     int i;
     for (i = 0; arg_string[i]; i++)
         if (!isdigit(arg_string[i])) {
-            fprintf(stdout, "%s", fg_usage);
+            fprintf(stdout, "pssh: invalid job number: [%s]\n", arg_string);
             return ;
         }
 
     target_job = atoi(arg_string);
 
     if (jobs[target_job].name == NULL) {
-        fprintf(stderr, "fg :%d: no such job\n", target_job);
+        fprintf(stdout, "pssh: invalid job number: [%d]\n", target_job);
         return ;
     }
 
     fprintf(stdout, "%s\n", jobs[target_job].name);
 
-    jobs[target_job].status = FG;
+    jobs[target_job].status = (fg) ? FG : BG;
 
     kill(-jobs[target_job].pgid, SIGCONT);
-    set_fg_pgid(jobs[target_job].pgid);
+
+    if (fg)
+        set_fg_pgid(jobs[target_job].pgid);
 }

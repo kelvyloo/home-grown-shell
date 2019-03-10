@@ -12,7 +12,7 @@ static char* builtin[] = {
     "which",  /* displays full path to command */
     "kill",   /* TODO send signal to process */
     "jobs",   /* list shell jobs */
-    "fg",     /* TODO foreground a process */
+    "fg",     /* foreground a process */
     "bg",     /* TODO background a process */
     NULL
 };
@@ -77,7 +77,10 @@ void builtin_execute (Task T)
         jobs_cmd();
     }
     else if (!strcmp (T.cmd, "fg")) {
-        fg_cmd(T.argv);
+        sigcont_cmd(T.argv, 1);
+    }
+    else if (!strcmp (T.cmd, "bg")) {
+        sigcont_cmd(T.argv, 0);
     }
     else {
         printf ("pssh: builtin command: %s (not implemented yet)\n", T.cmd);
