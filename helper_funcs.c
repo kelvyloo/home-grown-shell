@@ -7,6 +7,7 @@
 #include "parse.h"     /* Task struct */
 #include <fcntl.h>     /* open()      */
 #include "helper_funcs.h"
+#include <ctype.h>
 
 static void init_job(Job *job)
 {
@@ -89,14 +90,17 @@ void destroy_job(Job *job)
 
 void set_fg_pgid(pid_t pgid)
 {
-    void (*old)(int);
+    void (*old_in)(int);
+    void (*old_out)(int);
 
-    old = signal(SIGTTOU, SIG_IGN);
+    old_in = signal(SIGTTIN, SIG_IGN);
+    old_out = signal(SIGTTOU, SIG_IGN);
 
     tcsetpgrp (STDIN_FILENO, pgid);
     tcsetpgrp (STDOUT_FILENO, pgid);
 
-    signal (SIGTTOU, old);
+    signal (SIGTTIN, old_in);
+    signal (SIGTTOU, old_out);
 }
 
 int find_job_index(pid_t child_pid, Job *jobs, int num_jobs)
@@ -152,10 +156,10 @@ static char *status_to_string(JobStatus status)
     char *string = NULL;
 
     switch (status) {
-        case STOPPED: string = "stopped"; break;
-        case TERM:    string = "done";    break;
-        case BG:      string = "running"; break;
-        case FG:      string = "running"; break;
+        case STOPPED: string = "Stopped"; break;
+        case TERM:    string = "Done";    break;
+        case BG:      string = "Running"; break;
+        case FG:      string = "Running"; break;
         default:
             break;
     }
@@ -170,6 +174,51 @@ void jobs_cmd()
     for (i = 0; i < MAX_JOBS; i++)
         if (jobs[i].name != NULL)
             fprintf(stdout, "[%d]+ %-10s\t%s\n", 
-                    i, status_to_string(jobs[i].status),
-                    jobs[i].name);
+                    i, status_to_string(jobs[i].status), jobs[i].name);
+}
+
+static const char *fg_usage = "Usage: fg %<job number>\n";
+
+void fg_cmd(char **argv)
+{
+    char *arg_string = NULL;
+    int target_job = 0;
+    int string_size = 0;
+
+    arg_string = *(argv + 1);
+
+    if (arg_string == NULL) {
+        fprintf(stdout, "%s", fg_usage);
+        return ;
+    }
+
+    string_size = strlen(arg_string);
+
+    if (arg_string[0] != '%' || string_size < 2) {
+        fprintf(stdout, "%s", fg_usage);
+        return ;
+    }
+
+    arg_string = &argv[1][1];
+
+    int i;
+    for (i = 0; arg_string[i]; i++)
+        if (!isdigit(arg_string[i])) {
+            fprintf(stdout, "%s", fg_usage);
+            return ;
+        }
+
+    target_job = atoi(arg_string);
+
+    if (jobs[target_job].name == NULL) {
+        fprintf(stderr, "fg :%d: no such job\n", target_job);
+        return ;
+    }
+
+    fprintf(stdout, "%s\n", jobs[target_job].name);
+
+    jobs[target_job].status = FG;
+
+    kill(-jobs[target_job].pgid, SIGCONT);
+    set_fg_pgid(jobs[target_job].pgid);
 }

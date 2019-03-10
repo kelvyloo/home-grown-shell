@@ -251,7 +251,7 @@ void handler(int sig)
         /* If a job is in foreground and stopped:
          *  - set shell to foreground
          *  - tell user job is stopped */
-        if (jobs[job_index].status == FG) {
+        else if (jobs[job_index].status == FG) {
             set_fg_pgid(getpgrp());
             jobs[job_index].status = STOPPED;
             print_job_info(job_index, &jobs[job_index], 0);

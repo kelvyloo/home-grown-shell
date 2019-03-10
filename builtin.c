@@ -76,6 +76,9 @@ void builtin_execute (Task T)
     else if (!strcmp (T.cmd, "jobs")) {
         jobs_cmd();
     }
+    else if (!strcmp (T.cmd, "fg")) {
+        fg_cmd(T.argv);
+    }
     else {
         printf ("pssh: builtin command: %s (not implemented yet)\n", T.cmd);
     }
