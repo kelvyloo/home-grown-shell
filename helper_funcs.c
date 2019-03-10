@@ -99,40 +99,17 @@ void set_fg_pgid(pid_t pgid)
     signal (SIGTTOU, old);
 }
 
-int is_job_stopped(pid_t child_pid, Job *jobs, int num_jobs)
+int find_job_index(pid_t child_pid, Job *jobs, int num_jobs)
 {
     int i, j;
     int skip = 0;
-    int stopped_job;
+    int job_index_of_child = 0;
 
     for (i = 0; i < num_jobs; i++) {
 
         for (j = 0; j < jobs[i].npids; j++) {
             if (child_pid == jobs[i].pid[j]) {
-                stopped_job = i;
-                skip = 1;
-                break;
-            }
-        }
-        if (skip)
-            break;
-    }
-    
-    return stopped_job;
-}
-
-int is_job_done(pid_t child_pid, Job *jobs, int num_jobs, int *killed)
-{
-    int i, j;
-    int skip = 0;
-    int finished_job = 0;
-
-    for (i = 0; i < num_jobs; i++) {
-
-        for (j = 0; j < jobs[i].npids; j++) {
-            if (child_pid == jobs[i].pid[j]) {
-                killed[i]++;
-                finished_job = (killed[i] == jobs[i].npids) ? i+1 : 0;
+                job_index_of_child = i;
                 skip = 1;
                 break;
             }
@@ -141,28 +118,28 @@ int is_job_done(pid_t child_pid, Job *jobs, int num_jobs, int *killed)
             break;
     }
 
-    return finished_job;
+    return job_index_of_child;
 }
 
 void print_job_info(int job_num, Job *job, int done)
 {
     switch (job->status) {
         case STOPPED:
-            printf("\n[%d]+ Stopped \t%s\n", job_num+1, job->name);
+            fprintf(stderr, "\n[%d]+ Stopped \t%s\n", job_num+1, job->name);
             break;
         case BG:
             if (done)
-                printf("[%d]+ Done \t%s\n", job_num+1, job->name);
+                fprintf(stderr, "[%d]+ Done \t%s\n", job_num+1, job->name);
 
             else {
                 int t;
 
-                printf("[%d] ", job_num+1);
+                fprintf(stderr, "[%d] ", job_num+1);
 
                 for (t = 0; t < job->npids; t++)
-                    printf("%d ", job->pid[t]);
+                    fprintf(stderr, "%d ", job->pid[t]);
 
-                printf("\n");
+                fprintf(stderr, "\n");
             }
             break;
         default:
