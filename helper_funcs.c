@@ -18,28 +18,15 @@ static void init_job(Job *job)
     job->status = 0;
 }
 
-void init_jobs(Job *jobs, int num_jobs)
+void init_jobs()
 {
     int i;
 
-    for (i = 0; i < num_jobs; i++)
+    for (i = 0; i < MAX_JOBS; i++)
         init_job(&jobs[i]);
 }
 
-int assign_lowest_job_num(Job *jobs, int num_jobs)
-{
-    int i;
-    int lowest_available_job_num = 0;
-
-    for (i = 0; i < num_jobs; i++)
-        if (jobs[i].name == NULL) {
-            lowest_available_job_num = i;
-            break;
-        }
-
-    return lowest_available_job_num;
-}
-
+/* TODO fix */
 static void build_job_name(Parse *P, char *job_name)
 {
     int i, j;
@@ -68,8 +55,6 @@ void create_job(Job *job, Parse *P, pid_t pgid)
     job->name = malloc(256);
 
     build_job_name(P, job->name);
-
-    //strcpy(job->name, P->tasks[0].cmd);
     job->npids = P->ntasks;
     job->pgid = pgid;
     job->pid[0] = job->pgid;
@@ -103,13 +88,27 @@ void set_fg_pgid(pid_t pgid)
     signal (SIGTTOU, old_out);
 }
 
-int find_job_index(pid_t child_pid, Job *jobs, int num_jobs)
+int assign_lowest_job_num()
+{
+    int i;
+    int lowest_available_job_num = 0;
+
+    for (i = 0; i < MAX_JOBS; i++)
+        if (jobs[i].name == NULL) {
+            lowest_available_job_num = i;
+            break;
+        }
+
+    return lowest_available_job_num;
+}
+
+int find_job_index(pid_t child_pid)
 {
     int i, j;
     int skip = 0;
     int job_index_of_child = 0;
 
-    for (i = 0; i < num_jobs; i++) {
+    for (i = 0; i < MAX_JOBS; i++) {
 
         for (j = 0; j < jobs[i].npids; j++) {
             if (child_pid == jobs[i].pid[j]) {

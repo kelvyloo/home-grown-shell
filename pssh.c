@@ -123,7 +123,7 @@ void execute_tasks (Parse* P)
     input_fd = og_stdin;
     output_fd = og_stdout;
 
-    new_job_num = assign_lowest_job_num(jobs, MAX_JOBS);
+    new_job_num = assign_lowest_job_num();
 
     if (P->infile) {
         input_fd = open(P->infile, O_RDONLY, 0644);
@@ -175,19 +175,6 @@ void execute_tasks (Parse* P)
 
     if (P->background)
         print_job_info(new_job_num, &jobs[new_job_num], 0);
-
-#if 0
-    /* DEBUGGING SHIT */
-    printf("---------------------------------\n");
-    printf("jobs NAME: %s | PGID: %d | Num proc: %d | Status %d\n", 
-            jobs[new_job_num].name, jobs[new_job_num].pgid, 
-            jobs[new_job_num].npids, jobs[new_job_num].status);
-
-    for (t = 0; t < P->ntasks; t++)
-        printf("pid %d\n", jobs[new_job_num].pid[t]);
-
-    printf("---------------------------------\n");
-#endif
 
     free(pid);
 
@@ -242,7 +229,7 @@ void handler(int sig)
 
     child_pid = waitpid(-1, &status, WNOHANG | WUNTRACED | WCONTINUED);
 
-    job_index = find_job_index(child_pid, jobs, MAX_JOBS);
+    job_index = find_job_index(child_pid);
 
     if (WIFSTOPPED(status)) {
         if (jobs[job_index].status == BG)
@@ -296,7 +283,7 @@ int main (int argc, char** argv)
     signal(SIGTTOU, handler_sigttou);
     signal(SIGTTIN, handler_sigttin);
 
-    init_jobs(jobs, MAX_JOBS);
+    init_jobs();
 
     while (1) {
         if (bg_job_finished) {
