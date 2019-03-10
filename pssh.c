@@ -94,10 +94,26 @@ static int command_found (const char* cmd)
     return ret;
 }
 
-/* Called upon receiving a successful parse.
- * This function is responsible for cycling through the
- * tasks, and forking, executing, etc as necessary to get
- * the jobs done! */
+/* Executes the task(s) of a user specified job
+ *
+ * Iterates through the number of tasks checking if
+ * the function is a pssh built-in or POSIX standard
+ * function. 
+ *
+ * Forks on successful cmd inputs and uses
+ * pipes for interprocess communication. 
+ *
+ * If user specifies input or output file redirection, 
+ * the function opens those files and reads/writes to them
+ * accordingly. 
+ *
+ * Creates a job struct each time execute_tasks() is called 
+ * and associates it with lowest available job number.
+ *
+ * @param  P Parse struct containing job info
+ *
+ * @return none
+ * */
 void execute_tasks (Parse* P)
 {
     int t = 0;
@@ -129,6 +145,7 @@ void execute_tasks (Parse* P)
                 output_fd = open(P->outfile, O_CREAT | O_WRONLY, 0644);
 
         if (is_builtin(P->tasks[t].cmd)) {
+            /* TODO Handle backgrounded built-in functions */
             dup2(output_fd, STDOUT_FILENO);
             builtin_execute(P->tasks[t]);
         }
@@ -136,7 +153,7 @@ void execute_tasks (Parse* P)
             pid[t] = fork();
             setpgid(pid[t], pid[0]);
 
-            /* Parent process*/
+            /* Parent process */
             if (pid[t] > 0) {
                 input_fd = pipe_fd[READ_SIDE];
                 close(pipe_fd[WRITE_SIDE]);
@@ -168,7 +185,8 @@ void execute_tasks (Parse* P)
     /* DEBUGGING SHIT */
     printf("---------------------------------\n");
     printf("jobs NAME: %s | PGID: %d | Num proc: %d | Status %d\n", 
-            jobs[new_job_num].name, jobs[new_job_num].pgid, jobs[new_job_num].npids, jobs[new_job_num].status);
+            jobs[new_job_num].name, jobs[new_job_num].pgid, 
+            jobs[new_job_num].npids, jobs[new_job_num].status);
 
     for (t = 0; t < P->ntasks; t++)
         printf("pid %d\n", jobs[new_job_num].pid[t]);
@@ -186,18 +204,40 @@ void execute_tasks (Parse* P)
     close(og_stdout);
 }
 
+/* SIGTTOU Handler
+ *
+ * Pauses until shell has control of STDOUT
+ *
+ * @param sig signal number
+ *
+ * @return none */
 void handler_sigttou (int sig)
 {
     while (tcgetpgrp(STDOUT_FILENO) != getpid ())
         pause ();
 }
 
+/* SIGTTIN Handler
+ *
+ * Pauses until shell has control on STDIN
+ *
+ * @param sig signal number
+ *
+ * @return none */
 void handler_sigttin (int sig)
 {
     while (tcgetpgrp(STDIN_FILENO) != getpid ())
         pause ();
 }
 
+/* SIGCHLD Handler 
+ *
+ * Waits on children fork'ed from shell and
+ * handles their status (i.e. SIGTSTP, SIGCONT, etc) 
+ *
+ * @param sig signal number
+ *
+ * @return none */
 void handler(int sig)
 {
     pid_t child_pid;
@@ -208,6 +248,9 @@ void handler(int sig)
     child_pid = waitpid(-1, &status, WNOHANG | WUNTRACED | WCONTINUED);
 
     if (WIFSTOPPED(status)) {
+        /* If a job is stopped:
+         *  - set shell to foreground
+         *  - tell user job is stopped */
         int stopped_job = 0;
 
         set_fg_pgid(getpgrp());
@@ -221,6 +264,13 @@ void handler(int sig)
     else if (WIFCONTINUED(status)) {
     }
     else {
+        /* Check if job has had all of its children terminated:
+         * If job complete:
+         *  - set shell to foreground
+         * If FG job:
+         *  - remove job
+         * If BG job:
+         *  - send signal to main print and destroy job */
         finished_job = is_job_done(child_pid, jobs, MAX_JOBS, killed);
 
         if (finished_job) {
