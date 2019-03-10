@@ -28,9 +28,7 @@ void destroy_job(Job *job);
 
 void set_fg_pgid(pid_t pgid);
 
-int is_job_stopped(pid_t child_pid, Job *jobs, int num_jobs);
-
-int is_job_done(pid_t child_pid, Job *jobs, int num_jobs, int *killed);
+int find_job_index(pid_t child_pid, Job *jobs, int num_jobs);
 
 void print_job_info(int job_num, Job *job, int done);
 
