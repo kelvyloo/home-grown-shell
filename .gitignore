@@ -1,0 +1,6 @@
+builtin.o
+helper_funcs.o
+parse.o
+pssh
+pssh.o
+
