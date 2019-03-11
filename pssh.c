@@ -17,6 +17,12 @@
 int finished_job_num = 0;
 int bg_job_finished = 0;
 
+int suspended_job_num = 0;
+int bg_job_suspended = 0;
+
+int continued_job_num = 0;
+int bg_job_continued = 0;
+
 /*******************************************
  * Set to 1 to view the command line parse *
  *******************************************/
@@ -232,8 +238,12 @@ void handler(int sig)
     job_index = find_job_index(child_pid);
 
     if (WIFSTOPPED(status)) {
-        if (jobs[job_index].status == BG)
+        /* If the job was in the BG and running: signal suspended */
+        if (jobs[job_index].status == BG) {
             jobs[job_index].status = STOPPED;
+            suspended_job_num = job_index;
+            bg_job_suspended = 1;
+        }
 
         /* If a job is in foreground and stopped:
          *  - set shell to foreground
@@ -245,7 +255,9 @@ void handler(int sig)
         }
     }
     else if (WIFCONTINUED(status)) {
-        fprintf(stdout, "[%d]+ Continued \t%s\n", job_index, jobs[job_index].name);
+        /* Signal to shell that child has been continued */
+        bg_job_continued = 1;
+        continued_job_num = job_index;
     }
     else {
         /* Check if job has had all of its children terminated:
@@ -287,6 +299,16 @@ int main (int argc, char** argv)
     init_jobs();
 
     while (1) {
+        if (bg_job_continued) {
+            fprintf(stdout, "[%d]+ Continued \t%s\n", continued_job_num, jobs[continued_job_num].name);
+            bg_job_continued = 0;
+            continued_job_num = 0;
+        }
+        if (bg_job_suspended) {
+            print_job_info(suspended_job_num, &jobs[suspended_job_num], 0);
+            bg_job_suspended = 0;
+            suspended_job_num = 0;
+        }
         if (bg_job_finished) {
             print_job_info(finished_job_num, &jobs[finished_job_num], bg_job_finished);
             destroy_job(&jobs[finished_job_num]);

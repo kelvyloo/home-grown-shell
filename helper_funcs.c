@@ -129,25 +129,25 @@ void print_job_info(int job_num, Job *job, int done)
 {
 
     if (done) {
-        fprintf(stderr, "[%d]+ Done \t%s\n", job_num, job->name);
+        fprintf(stdout, "[%d]+ Done \t%s\n", job_num, job->name);
         return ;
     }
 
     switch (job->status) {
         case STOPPED:
-            fprintf(stderr, "\n[%d]+ Suspended \t%s\n", job_num, job->name);
+            fprintf(stdout, "\n[%d]+ Suspended \t%s\n", job_num, job->name);
             break;
         case BG:
             {
-            int t;
+                int t;
 
-            fprintf(stderr, "[%d] ", job_num);
+                fprintf(stdout, "[%d] ", job_num);
 
-            for (t = 0; t < job->npids; t++)
-                fprintf(stderr, "%d ", job->pid[t]);
+                for (t = 0; t < job->npids; t++)
+                    fprintf(stdout, "%d ", job->pid[t]);
 
-            fprintf(stderr, "\n");
-            break;
+                fprintf(stdout, "\n");
+                break;
             }
         default:
             break;
