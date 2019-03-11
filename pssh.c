@@ -259,6 +259,11 @@ void handler(int sig)
         bg_job_continued = 1;
         continued_job_num = job_index;
     }
+    else if (WIFSIGNALED(status)) {
+        /* If job is terminated by SIGTERM/SIGKILL */
+        bg_job_finished = 1;
+        finished_job_num = job_index;
+    }
     else {
         /* Check if job has had all of its children terminated:
          * If job complete:
