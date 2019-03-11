@@ -245,6 +245,7 @@ void handler(int sig)
         }
     }
     else if (WIFCONTINUED(status)) {
+        fprintf(stdout, "[%d]+ Continued \t%s\n", job_index, jobs[job_index].name);
     }
     else {
         /* Check if job has had all of its children terminated:

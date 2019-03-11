@@ -127,25 +127,28 @@ int find_job_index(pid_t child_pid)
 
 void print_job_info(int job_num, Job *job, int done)
 {
+
+    if (done) {
+        fprintf(stderr, "[%d]+ Done \t%s\n", job_num, job->name);
+        return ;
+    }
+
     switch (job->status) {
         case STOPPED:
             fprintf(stderr, "\n[%d]+ Suspended \t%s\n", job_num, job->name);
             break;
         case BG:
-            if (done)
-                fprintf(stderr, "[%d]+ Done \t%s\n", job_num, job->name);
+            {
+            int t;
 
-            else {
-                int t;
+            fprintf(stderr, "[%d] ", job_num);
 
-                fprintf(stderr, "[%d] ", job_num);
+            for (t = 0; t < job->npids; t++)
+                fprintf(stderr, "%d ", job->pid[t]);
 
-                for (t = 0; t < job->npids; t++)
-                    fprintf(stderr, "%d ", job->pid[t]);
-
-                fprintf(stderr, "\n");
-            }
+            fprintf(stderr, "\n");
             break;
+            }
         default:
             break;
     }
@@ -233,8 +236,6 @@ void sigcont_cmd(char **argv, int fg)
 
     if (fg)
         set_fg_pgid(jobs[target_job].pgid);
-    else
-        fprintf(stdout, "[%d]+ Continued \t%s\n", target_job, jobs[target_job].name);
 }
 
 static int send_signal(pid_t pid, int signal) 
@@ -311,8 +312,6 @@ void kill_cmd(char **argv)
         pid = atoi(arg_string);
         
         pid = (job) ? jobs[pid].pgid : pid;
-
-        //fprintf(stdout, "Sending signal \"%s\" to %d\n", strsignal(signal), pid);
 
         send_signal(pid, signal);
     }
