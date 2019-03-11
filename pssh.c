@@ -255,9 +255,11 @@ void handler(int sig)
         }
     }
     else if (WIFCONTINUED(status)) {
-        /* Signal to shell that child has been continued */
-        bg_job_continued = 1;
-        continued_job_num = job_index;
+        /* Signal to shell that bg running child has been continued */
+        if (jobs[job_index].status != FG) {
+            bg_job_continued = 1;
+            continued_job_num = job_index;
+        }
     }
     else if (WIFSIGNALED(status)) {
         /* If job is terminated by SIGTERM/SIGKILL */
