@@ -129,7 +129,7 @@ void print_job_info(int job_num, Job *job, int done)
 {
     switch (job->status) {
         case STOPPED:
-            fprintf(stderr, "\n[%d]+ Stopped \t%s\n", job_num, job->name);
+            fprintf(stderr, "\n[%d]+ Suspended \t%s\n", job_num, job->name);
             break;
         case BG:
             if (done)
@@ -233,6 +233,8 @@ void sigcont_cmd(char **argv, int fg)
 
     if (fg)
         set_fg_pgid(jobs[target_job].pgid);
+    else
+        fprintf(stdout, "[%d]+ Continued \t%s\n", target_job, jobs[target_job].name);
 }
 
 static int send_signal(pid_t pid, int signal) 
@@ -310,7 +312,7 @@ void kill_cmd(char **argv)
         
         pid = (job) ? jobs[pid].pgid : pid;
 
-        fprintf(stdout, "Sending signal \"%s\" to %d\n", strsignal(signal), pid);
+        //fprintf(stdout, "Sending signal \"%s\" to %d\n", strsignal(signal), pid);
 
         send_signal(pid, signal);
     }
