@@ -74,6 +74,17 @@ void destroy_job(Job *job)
     job->status = 0;
 }
 
+void remove_bg_jobs()
+{
+    int i;
+
+    for (i = 0; i < MAX_JOBS; i++)
+        if (jobs[i].status == TERM) {
+            print_job_info(i, &jobs[i]);
+            destroy_job(&jobs[i]);
+        }
+}
+
 void set_fg_pgid(pid_t pgid)
 {
     void (*old_in)(int);
@@ -125,30 +136,31 @@ int find_job_index(pid_t child_pid)
     return job_index_of_child;
 }
 
-void print_job_info(int job_num, Job *job, int done)
+void print_bg_job(int job_num, Job *job)
 {
+    int t;
 
-    if (done) {
-        fprintf(stdout, "[%d]+ Done \t%s\n", job_num, job->name);
-        return ;
-    }
+    fprintf(stdout, "[%d] ", job_num);
+
+    for (t = 0; t < job->npids; t++)
+        fprintf(stdout, "%d ", job->pid[t]);
+
+    fprintf(stdout, "\n");
+}
+
+void print_job_info(int job_num, Job *job)
+{
 
     switch (job->status) {
         case STOPPED:
-            fprintf(stdout, "\n[%d]+ Suspended \t%s\n", job_num, job->name);
+            fprintf(stdout, "[%d]+ Suspended \t%s\n", job_num, job->name);
+            break;
+        case TERM:
+            fprintf(stdout, "[%d]+ Done \t%s\n", job_num, job->name);
             break;
         case BG:
-            {
-                int t;
-
-                fprintf(stdout, "[%d] ", job_num);
-
-                for (t = 0; t < job->npids; t++)
-                    fprintf(stdout, "%d ", job->pid[t]);
-
-                fprintf(stdout, "\n");
-                break;
-            }
+            fprintf(stdout, "[%d]+ Continued \t%s\n", job_num, jobs->name);
+            break;
         default:
             break;
     }

@@ -50,6 +50,8 @@ void create_job(Job *job, Parse *P, pid_t pgid);
  * */
 void destroy_job(Job *job);
 
+void remove_bg_jobs();
+
 /* Give target process group foreground
  *
  * @param pgid  process group id
@@ -74,6 +76,8 @@ int assign_lowest_job_num();
  * */
 int find_job_index(pid_t child_pid);
 
+void print_bg_job(int job_num, Job *job);
+
 /* Print status of a job
  *
  * @param job_num  job number
@@ -82,7 +86,7 @@ int find_job_index(pid_t child_pid);
  *
  * @return none
  * */
-void print_job_info(int job_num, Job *job, int done);
+void print_job_info(int job_num, Job *job);
 
 /* Built-in job command for pssh
  *
