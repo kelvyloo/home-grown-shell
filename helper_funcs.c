@@ -36,18 +36,19 @@ static void build_job_name(Parse *P, char *job_name)
 
         for (j = 0; P->tasks[i].argv[j]; j++) {
             if (i == 0 && j == 0)
-                strncpy(job_name, P->tasks[i].argv[j], 
-                        sizeof(job_name)/sizeof(char));
+                strcpy(job_name, P->tasks[i].argv[j]);
+                   
             else
-                strncat(job_name, P->tasks[i].argv[j], 
-                        sizeof(job_name)/sizeof(char));
+                strcat(job_name, P->tasks[i].argv[j]);
 
-            strncat(job_name, " ", sizeof(job_name)/sizeof(char));
+            strcat(job_name, " ");
         }
         
         if (i != P->ntasks-1)
-            strncat(job_name, "| ", sizeof(job_name)/sizeof(char));
+            strcat(job_name, "| ");
     }
+    if (P->background)
+        strcat(job_name, "&");
 }
 
 void create_job(Job *job, Parse *P, pid_t pgid)
