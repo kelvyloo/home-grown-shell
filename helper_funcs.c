@@ -269,9 +269,8 @@ static int send_signal(pid_t pid, int signal)
 {
     int ret;
 
-     // Stopped children need to be continued before sending SIGTERM
-    if (signal == SIGTERM)
-        kill(-pid, SIGCONT);
+     /* Stopped children need to be continued before sending signals */
+    kill(-pid, SIGCONT);
 
     ret = kill(-pid, signal);
 
@@ -344,8 +343,10 @@ void kill_cmd(char **argv)
         
         pid = (job) ? jobs[pid].pgid : pid;
 
-        /* Sending SIGTERM to multiple process does not trigger SIGCHLD
-         * handler without a slight delay */
+        /* Sending signals to multiple process does not always
+         * trigger SIGCHLD handler for every child so a slight 
+         * delay was added to ensure that the handler has time
+         * to react */
         usleep (50);
 
         send_signal(pid, signal);
