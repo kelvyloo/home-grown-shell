@@ -310,13 +310,11 @@ int main (int argc, char** argv)
     init_jobs();
 
     while (1) {
-        counter = 0;
-
         if (bg_job_suspended)
-            print_job_status_updates(&bg_job_suspended, suspended_job_num);
+            print_job_status_updates(&bg_job_suspended, suspended_job_num, &counter);
 
         if (bg_job_continued)
-            print_job_status_updates(&bg_job_continued, continued_job_num);
+            print_job_status_updates(&bg_job_continued, continued_job_num, &counter);
 
         remove_bg_jobs();
 
