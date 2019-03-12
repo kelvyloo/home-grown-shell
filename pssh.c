@@ -14,13 +14,12 @@
 
 #include "helper_funcs.h"
 
-int finished_job_num = 0;
-int bg_job_finished = 0;
+int counter = 0;
 
-int suspended_job_num = 0;
+int suspended_job_num[MAX_JOBS] = {[0 ... (MAX_JOBS-1)] = -1};
 int bg_job_suspended = 0;
 
-int continued_job_num = 0;
+int continued_job_num[MAX_JOBS] = {[0 ... (MAX_JOBS-1)] = -1};
 int bg_job_continued = 0;
 
 /*******************************************
@@ -180,7 +179,7 @@ void execute_tasks (Parse* P)
     }
 
     if (P->background)
-        print_job_info(new_job_num, &jobs[new_job_num], 0);
+        print_bg_job(new_job_num, &jobs[new_job_num]);
 
     free(pid);
 
@@ -241,8 +240,9 @@ void handler(int sig)
         /* If the job was in the BG and running: signal suspended */
         if (jobs[job_index].status == BG) {
             jobs[job_index].status = STOPPED;
-            suspended_job_num = job_index;
+            suspended_job_num[counter] = job_index;
             bg_job_suspended = 1;
+            counter++;
         }
 
         /* If a job is in foreground and stopped:
@@ -251,20 +251,26 @@ void handler(int sig)
         else if (jobs[job_index].status == FG) {
             set_fg_pgid(getpgrp());
             jobs[job_index].status = STOPPED;
-            print_job_info(job_index, &jobs[job_index], 0);
+            print_job_info(job_index, &jobs[job_index]);
         }
     }
     else if (WIFCONTINUED(status)) {
         /* Signal to shell that bg running child has been continued */
-        if (jobs[job_index].status != FG) {
+        if (jobs[job_index].status == STOPPED) {
+            jobs[job_index].status = BG;
             bg_job_continued = 1;
-            continued_job_num = job_index;
+            continued_job_num[counter] = job_index;
+            counter++;
         }
     }
     else if (WIFSIGNALED(status)) {
         /* If job is terminated by SIGTERM/SIGKILL */
-        bg_job_finished = 1;
-        finished_job_num = job_index;
+        if (jobs[job_index].status == FG) {
+            destroy_job(&jobs[job_index]);
+            set_fg_pgid(getpgrp());
+        }
+        else
+            jobs[job_index].status = TERM;
     }
     else {
         /* Check if job has had all of its children terminated:
@@ -282,10 +288,8 @@ void handler(int sig)
 
             if (jobs[job_index].status == FG)
                 destroy_job(&jobs[job_index]);
-            else {
-                bg_job_finished = 1;
-                finished_job_num = job_index;
-            }
+            else
+                jobs[job_index].status = TERM;
         }
     }
 
@@ -306,22 +310,15 @@ int main (int argc, char** argv)
     init_jobs();
 
     while (1) {
-        if (bg_job_continued) {
-            fprintf(stdout, "[%d]+ Continued \t%s\n", continued_job_num, jobs[continued_job_num].name);
-            bg_job_continued = 0;
-            continued_job_num = 0;
-        }
-        if (bg_job_suspended) {
-            print_job_info(suspended_job_num, &jobs[suspended_job_num], 0);
-            bg_job_suspended = 0;
-            suspended_job_num = 0;
-        }
-        if (bg_job_finished) {
-            print_job_info(finished_job_num, &jobs[finished_job_num], bg_job_finished);
-            destroy_job(&jobs[finished_job_num]);
-            bg_job_finished = 0;
-            finished_job_num = 0;
-        }
+        counter = 0;
+
+        if (bg_job_suspended)
+            print_job_status_updates(&bg_job_suspended, suspended_job_num);
+
+        if (bg_job_continued)
+            print_job_status_updates(&bg_job_continued, continued_job_num);
+
+        remove_bg_jobs();
 
         cmdline = readline (build_prompt());
         if (!cmdline)       /* EOF (ex: ctrl-d) */
