@@ -320,7 +320,7 @@ void kill_cmd(char **argv)
         i = 3;
     }
     else {
-        signal = SIGTERM;
+        signal = SIGINT;
         i = 1;
     }
 
