@@ -88,7 +88,15 @@ void print_bg_job(int job_num, Job *job);
  * */
 void print_job_info(int job_num, Job *job);
 
-void print_job_status_updates(int *signal, int jobs[]);
+/* Print status updates for jobs in transition
+ *
+ * @param signal        signal sent from SIGCHLD handler
+ * @param updated_jobs  array of job_indices
+ * @param done          number of jobs to print update
+ *
+ * @return none
+ * */
+void print_job_status_updates(int *signal, int updated_jobs[], int *counter);
 
 /* Built-in job command for pssh
  *

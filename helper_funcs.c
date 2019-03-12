@@ -166,19 +166,19 @@ void print_job_info(int job_num, Job *job)
     }
 }
 
-void print_job_status_updates(int *signal, int updated_jobs[])
+void print_job_status_updates(int *signal, int updated_jobs[], int *counter)
 {
     int i;
 
-    for (i = 0; i < MAX_JOBS; i++)
+    for (i = 0; i < *counter; i++)
         if (updated_jobs[i] != -1) {
             print_job_info(updated_jobs[i], &jobs[updated_jobs[i]]);
             updated_jobs[i] = -1;
         }
 
     *signal = 0;
+    *counter = 0;
 }
-
 
 static char *status_to_string(JobStatus status)
 {
@@ -268,6 +268,10 @@ static int send_signal(pid_t pid, int signal)
 {
     int ret;
 
+     // Stopped children need to be continued before sending SIGTERM
+    if (signal == SIGTERM)
+        kill(-pid, SIGCONT);
+
     ret = kill(-pid, signal);
 
     if (ret == -1 || signal == 0) {
@@ -338,6 +342,10 @@ void kill_cmd(char **argv)
         pid = atoi(arg_string);
         
         pid = (job) ? jobs[pid].pgid : pid;
+
+        /* Sending SIGTERM to multiple process does not trigger SIGCHLD
+         * handler without a slight delay */
+        usleep (50);
 
         send_signal(pid, signal);
     }
