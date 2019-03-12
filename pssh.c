@@ -174,8 +174,11 @@ void execute_tasks (Parse* P)
                 execvp(P->tasks[t].cmd, P->tasks[t].argv);
             }
         }
-        else
+        else {
+            set_fg_pgid(getpgrp());
+            destroy_job(&jobs[new_job_num]);
             fprintf(stderr, "pssh: %s command not found\n", P->tasks[t].cmd);
+        }
     }
 
     if (P->background)
