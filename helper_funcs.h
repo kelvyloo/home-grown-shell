@@ -88,6 +88,8 @@ void print_bg_job(int job_num, Job *job);
  * */
 void print_job_info(int job_num, Job *job);
 
+void print_job_status_updates(int *signal, int jobs[]);
+
 /* Built-in job command for pssh
  *
  * @param none

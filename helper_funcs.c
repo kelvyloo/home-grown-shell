@@ -166,6 +166,20 @@ void print_job_info(int job_num, Job *job)
     }
 }
 
+void print_job_status_updates(int *signal, int updated_jobs[])
+{
+    int i;
+
+    for (i = 0; i < MAX_JOBS; i++)
+        if (updated_jobs[i] != -1) {
+            print_job_info(updated_jobs[i], &jobs[updated_jobs[i]]);
+            updated_jobs[i] = -1;
+        }
+
+    *signal = 0;
+}
+
+
 static char *status_to_string(JobStatus status)
 {
     char *string = NULL;
